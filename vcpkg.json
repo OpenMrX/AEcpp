@@ -1,0 +1,23 @@
+{
+  "name": "vxagentengine",
+  "version": "0.1.0",
+  "builtin-baseline": "ed09e982d27b13ad6931ccc7d08e548024bf7f38",
+  "dependencies": [
+    "curl",
+    "nlohmann-json"
+  ],
+  "features": {
+    "otel": {
+      "description": "OpenTelemetry trace sink (AEOtel.hpp, VMX_AE_OTEL=ON)",
+      "dependencies": [
+        "opentelemetry-cpp"
+      ]
+    },
+    "http": {
+      "description": "Drogon HTTP exposure layer (AEHttpServer.hpp, VMX_AE_HTTP=ON)",
+      "dependencies": [
+        "drogon"
+      ]
+    }
+  }
+}

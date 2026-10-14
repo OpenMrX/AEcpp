@@ -1,0 +1,363 @@
+#pragma once
+
+/// @file AEType.hpp
+/// @brief 统一中间表示（IR）层：token 粒度流式事件 + 类型化错误 + 自修复 JSON。
+///
+/// @details
+/// 设计约束（关键）：
+/// - 本层【不 include】任何 Butler / MemoryStick 实现，保持 VMX::AE 完全解耦，
+/// 可独立编译并自跑单循环单 agent。Butler 完全体经 IAgentExecutor 单向消费。
+/// - token 粒度的 LlmDelta 是 AgentEngine 自身的 IR；与 Butler 的
+/// ButlerStreamEvent（事件粒度、回调式）是两套模型，由 Butler 侧薄适配器桥接，
+/// 禁止在 VMX::AE 内引入 ButlerStreamEvent 类型。
+///
+/// @note 所属命名空间：VMX::AE
+/// @note 依赖：Core::Result / Core::Logger、nlohmann::json。
+
+#include <algorithm>
+#include <optional>
+#include <regex>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include <nlohmann/json.hpp>
+
+#include "Core/Result.hpp"
+#include "Core/Logger.hpp"
+
+namespace VMX::AE
+{
+
+    // ------------------------------------------------------------ 类型化错误
+    enum class AgentError
+    {
+        None,
+        MaxIterations,
+        LlmTransport,
+        LlmParse,
+        ToolNotFound,
+        ToolExec,
+        ContextFull,
+        BudgetExceeded,
+        ConfigMissing,
+        Cancelled // §11 优雅退出（取消信号 / 消费方提前终止）
+    };
+
+    // ------------------------------------------------------ LLM 增量事件（IR）
+    // LlmDelta 即统一中间表示（StreamEvent）：各后端把自家原始流归一化为 LlmDelta，
+    // 上层 AgentEngine 只消费 IR，完全不感知后端差异。token 粒度。
+    struct LlmDelta
+    {
+        enum class Kind
+        {
+            Text,
+            Thinking, // Phase G: reasoning_content 思考内容
+            ToolCall,
+            Usage,
+            Done,
+            Error // 流式传输错误（替代协程内 throw，H15 合规）
+        } kind{Kind::Text};
+
+        std::string text_content;
+        std::string thinking_content; // Phase G: reasoning_content 增量
+        std::string error_message;    // Kind::Error 时有效：传输错误信息
+
+        struct ToolCallInfo
+        {
+            std::string id;
+            std::string name;
+            nlohmann::json arguments;
+        };
+        std::optional<ToolCallInfo> tool_call_info;
+
+        struct UsageInfo
+        {
+            std::size_t prompt_tokens = 0;
+            std::size_t completion_tokens = 0;
+        };
+        std::optional<UsageInfo> usage_info;
+
+        static auto text(std::string_view t) -> LlmDelta
+        {
+            LlmDelta d;
+            d.kind = Kind::Text;
+            d.text_content = std::string{t};
+            return d;
+        }
+        static auto thinking(std::string_view t) -> LlmDelta
+        {
+            LlmDelta d;
+            d.kind = Kind::Thinking;
+            d.thinking_content = std::string{t};
+            return d;
+        }
+        static auto tool_call(std::string id, std::string name, nlohmann::json a) -> LlmDelta
+        {
+            LlmDelta d;
+            d.kind = Kind::ToolCall;
+            d.tool_call_info = ToolCallInfo{std::move(id), std::move(name), std::move(a)};
+            return d;
+        }
+        static auto usage(std::size_t p, std::size_t c) -> LlmDelta
+        {
+            LlmDelta d;
+            d.kind = Kind::Usage;
+            d.usage_info = UsageInfo{p, c};
+            return d;
+        }
+        static auto done() -> LlmDelta
+        {
+            LlmDelta d;
+            d.kind = Kind::Done;
+            return d;
+        }
+        static auto error(std::string msg) -> LlmDelta
+        {
+            LlmDelta d;
+            d.kind = Kind::Error;
+            d.error_message = std::move(msg);
+            return d;
+        }
+    };
+
+    // -------------------------------------------------- JSON 回退级别
+    // 记录 SelfHealingJson 使用了哪一级回退策略，用于日志/遥测/调试。
+    enum class JsonFallbackLevel
+    {
+        None = 0,       // 解析失败，未命中任何级别
+        Direct = 1,     // L1 直接 JSON::parse 成功
+        MarkdownFence,  // L2 从 ```json ... ``` 代码块提取
+        BracketMatch,   // L3 括号匹配找完整 {} + 尾随逗号修复
+        RegexExtract,   // L4 正则提取 "answer": "..."（React 独有能力，已合并）
+        RawText         // L5 全部失败，将原始文本作为 answer 返回
+    };
+
+    // ------------------------------------------- 自修复 JSON 解析
+    // LLM 输出的 tool_call arguments 常残缺/不合法；本类按成本递增修复，命中即停。
+    //
+    // repair()         — 原始 3 级（L1–L3）：仅尝试结构化 JSON，失败返回 nullopt。
+    //                     用于 tool_call arguments 修复（StreamingLLMClient）。
+    // repairWithFallback() — 增强 5 级（L1–L5）：融入 React 的 L4 正则提取 + L5 裸文本兜底，
+    //                         用于 AgentEngine 顶层 LLM 响应解析（无 tool 的纯文本场景）。
+    class SelfHealingJson
+    {
+    public:
+        // ---- 原始接口（向后兼容，用于 tool_call args 修复） ----
+        static auto repair(std::string_view raw) -> std::optional<nlohmann::json>
+        {
+            auto [json, level] = repairWithFallback(raw);
+            (void)level;
+            return json;
+        }
+
+        // ---- 增强接口：5 级回退 + 级别追踪 ----
+        // 返回 (解析结果, 命中级别)。L5 裸文本兜底时结果包含 {"answer": raw_text}。
+        static auto repairWithFallback(std::string_view raw)
+            -> std::pair<std::optional<nlohmann::json>, JsonFallbackLevel>
+        {
+            std::string s = strip_markdown(raw);    // 1) 去 ```json 围栏与解释文字
+            s = sanitize(s);                        // 2) 尾随逗号/括号配平
+            for (auto &cand : truncate_to_valid(s)) // 3) 截断到首个可解析 JSON 边界
+            {
+                try
+                {
+                    auto j = nlohmann::json::parse(cand);
+                    return {j, JsonFallbackLevel::BracketMatch};
+                }
+                catch (...)
+                {
+                }
+            }
+
+            // ---- React L4：正则提取 "answer": "..." ----
+            auto regex_answer = extract_answer_regex(raw);
+            if (regex_answer.has_value())
+            {
+                return {nlohmann::json::object({{"answer", *regex_answer}}),
+                        JsonFallbackLevel::RegexExtract};
+            }
+
+            // ---- React L5：全部失败，原始文本作为 answer 兜底 ----
+            std::string trimmed = trim_copy(raw);
+            if (!trimmed.empty())
+            {
+                return {nlohmann::json::object({{"answer", trimmed}}),
+                        JsonFallbackLevel::RawText};
+            }
+
+            return {std::nullopt, JsonFallbackLevel::None};
+        }
+
+    private:
+        static auto trim_copy(std::string_view sv) -> std::string
+        {
+            auto start = sv.find_first_not_of(" \t\n\r");
+            if (start == std::string_view::npos)
+                return {};
+            auto end = sv.find_last_not_of(" \t\n\r");
+            return std::string{sv.substr(start, end - start + 1)};
+        }
+
+        static auto strip_markdown(std::string_view in) -> std::string
+        {
+            std::string s(in);
+            auto a = s.find("```");
+            if (a != std::string::npos)
+            {
+                auto start = a + 3;
+                auto nl = s.find('\n', start);
+                if (nl != std::string::npos && nl - start < 20)
+                    start = nl + 1;
+                auto b = s.find("```", start);
+                if (b != std::string::npos)
+                {
+                    s = s.substr(start, b - start);
+                    while (!s.empty() && (s.back() == '\n' || s.back() == '\r'))
+                        s.pop_back();
+                    return s;
+                }
+            }
+            return s;
+        }
+
+        static auto sanitize(std::string s) -> std::string
+        {
+            size_t pos = 0;
+            while ((pos = s.find(",}")) != std::string::npos)
+                s.replace(pos, 2, "}");
+            while ((pos = s.find(",]")) != std::string::npos)
+                s.replace(pos, 2, "]");
+            int depth = 0;
+            for (char c : s)
+            {
+                if (c == '{' || c == '[')
+                    ++depth;
+                else if (c == '}' || c == ']')
+                    --depth;
+            }
+            while (depth-- > 0)
+                s += '}';
+            return s;
+        }
+
+        static auto truncate_to_valid(std::string_view in) -> std::vector<std::string>
+        {
+            std::vector<std::string> out;
+            std::string cur;
+            int depth = 0;
+            for (char c : in)
+            {
+                cur.push_back(c);
+                if (c == '{' || c == '[')
+                    ++depth;
+                else if (c == '}' || c == ']')
+                {
+                    --depth;
+                    if (depth == 0)
+                        out.push_back(cur);
+                }
+            }
+            std::reverse(out.begin(), out.end());
+            return out;
+        }
+
+        // React L4：提取 "answer": "..."（支持转义引号）。用字符串查找替代 std::regex，
+        // 规避 MSVC Debug 下 std::regex 对真实模型文本的堆损坏/栈溢出风险。
+        static auto extract_answer_regex(std::string_view raw) -> std::optional<std::string>
+        {
+            constexpr std::string_view kKey{"\"answer\""};
+            const auto key_pos = raw.find(kKey);
+            if (key_pos == std::string_view::npos)
+                return std::nullopt;
+
+            // 跳过键与空白，定位冒号
+            auto i = key_pos + kKey.size();
+            while (i < raw.size() && (raw[i] == ' ' || raw[i] == '\t' || raw[i] == '\n' || raw[i] == '\r'))
+                ++i;
+            if (i >= raw.size() || raw[i] != ':')
+                return std::nullopt;
+            ++i;
+            while (i < raw.size() && (raw[i] == ' ' || raw[i] == '\t' || raw[i] == '\n' || raw[i] == '\r'))
+                ++i;
+            if (i >= raw.size() || raw[i] != '"')
+                return std::nullopt;
+            ++i;
+
+            // 逐字符解析字符串值，支持 \x 转义
+            std::string out;
+            while (i < raw.size())
+            {
+                const char c = raw[i];
+                if (c == '"')
+                    return out;
+                if (c == '\\' && i + 1 < raw.size())
+                {
+                    ++i;
+                    out += raw[i];
+                }
+                else
+                {
+                    out += c;
+                }
+                ++i;
+            }
+            return std::nullopt; // 未闭合引号
+        }
+    };
+
+    // ---------------------------------------------------- 对外事件（编排门面产出）
+    enum class EventKind
+    {
+        Thinking,
+        Token,
+        ToolCall,
+        ToolResult,
+        Final,
+        Error
+    };
+
+    struct AgentEvent
+    {
+        EventKind kind{EventKind::Thinking};
+        std::string payload;
+        Core::Error error_info; // 仅 Error 事件使用
+
+        static auto token(std::string_view t) -> AgentEvent
+        {
+            AgentEvent e;
+            e.kind = EventKind::Token;
+            e.payload = std::string{t};
+            return e;
+        }
+        static auto tool_call(std::string_view name) -> AgentEvent
+        {
+            AgentEvent e;
+            e.kind = EventKind::ToolCall;
+            e.payload = std::string{name};
+            return e;
+        }
+        static auto tool_result(std::string_view r) -> AgentEvent
+        {
+            AgentEvent e;
+            e.kind = EventKind::ToolResult;
+            e.payload = std::string{r};
+            return e;
+        }
+        static auto error(Core::Error err) -> AgentEvent
+        {
+            AgentEvent e;
+            e.kind = EventKind::Error;
+            e.error_info = std::move(err);
+            return e;
+        }
+        static auto final_event(std::string_view t = "") -> AgentEvent
+        {
+            AgentEvent e;
+            e.kind = EventKind::Final;
+            e.payload = std::string{t};
+            return e;
+        }
+    };
+
+} // namespace VMX::AE
