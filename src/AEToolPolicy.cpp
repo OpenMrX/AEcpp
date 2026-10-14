@@ -1,5 +1,5 @@
 // =============================================================================
-//  VMX::AE — AEToolPolicy.cpp
+//  AE::Engine — AEToolPolicy.cpp
 //  工具安全策略引擎实现。
 //  从 React+ToolRegistry.cpp 迁移，适配 AE::IToolProvider 接口。
 // =============================================================================
@@ -11,7 +11,7 @@
 
 #include "Core/Logger.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ================================================================
@@ -330,4 +330,4 @@ namespace VMX::AE
         return delegate_.get_tools_schema();
     }
 
-} // namespace VMX::AE
+} // namespace AE::Engine

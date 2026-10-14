@@ -5,7 +5,7 @@
 ///
 /// @details
 /// 设计约束（关键）：
-/// - 纯 VMX::AE 模块，不依赖 Butler / DCEE / MemoryStick；经既有
+/// - 纯 AE::Engine 模块，不依赖 Butler / DCEE / MemoryStick；经既有
 /// IPermissionGate 注入点接线（AgentEngine 在每次工具执行前调用
 /// can_execute_tool），不修改已构建文件的对外签名。
 /// - 默认拒绝一切出网（DefaultDeny，安全优先）；仅放行显式白名单中的 host/域名。
@@ -13,20 +13,20 @@
 /// 即便工具参数里夹带，也一律拒绝，杜绝「工具输出回灌 + 内网穿透」组合风险。
 /// - 这是**纵深防御**的一环：DCEE 沙箱负责进程级隔离，本层负责「出网意图」拦截。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 
 #include <cctype>
 #include <string>
 #include <string_view>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "Core/Logger.hpp"
 #include "IAE.hpp" // IPermissionGate
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ---------------------------------------------------- 出站策略
@@ -257,4 +257,4 @@ namespace VMX::AE
         EgressPolicy m_policy;
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

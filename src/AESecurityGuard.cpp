@@ -1,7 +1,7 @@
 // =============================================================================
-//  VMX::AE — AESecurityGuard.cpp
+//  AE::Engine — AESecurityGuard.cpp
 //  安全组件实现：路径验证、Shell 注入防护、持久化权限。
-//  从 React+Security.cpp 迁移，命名空间改为 VMX::AE。
+//  从 React+Security.cpp 迁移，命名空间改为 AE::Engine。
 // =============================================================================
 
 #include "AESecurityGuard.hpp"
@@ -11,7 +11,7 @@
 #include <filesystem>
 #include <fstream>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Logger.hpp"
 
@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #endif
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ================================================================
@@ -119,7 +119,7 @@ namespace VMX::AE
             const char *home = std::getenv("HOME");
 #endif
             std::string base = home ? std::string{home} : ".";
-            return base + "/.vmx/security";
+            return base + "/.ae/security";
         }
 
         [[nodiscard]] auto store_file_path(const std::string &dir) -> std::string
@@ -256,4 +256,4 @@ namespace VMX::AE
         }
     }
 
-} // namespace VMX::AE
+} // namespace AE::Engine

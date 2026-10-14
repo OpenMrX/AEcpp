@@ -1,5 +1,5 @@
 // vxae 编译期校验单元（非功能测试）。
-// 仅包含 VMX::AE 全部核心头文件，并对关键 IR 类型取 sizeof，
+// 仅包含 AE::Engine 全部核心头文件，并对关键 IR 类型取 sizeof，
 // 触发编译器对头文件整体的语法/语义检查，而不进入 AgentEngine 重型协程实例化。
 // 目的是在构建期验证头文件可解析、可编译；功能级实例化测试属于后续实现任务。
 
@@ -30,16 +30,10 @@
 #include "AEConfig.hpp"
 #include "AETelemetry.hpp"
 #include "AERecordReplay.hpp"
-#ifdef VMX_AE_ENABLE_OTEL
-#include "AEOtel.hpp"
-#endif
-#ifdef VMX_AE_ENABLE_HTTP
-#include "AEHttpServer.hpp"
-#endif
 
 namespace
 {
-    using namespace VMX::AE;
+    using namespace AE::Engine;
 
     // 取核心 IR 类型的编译期大小，强制类型完整（complete type）检查。
     constexpr std::size_t ae_probe2 =
@@ -64,7 +58,7 @@ namespace
         sizeof(ReplayController) +
         sizeof(AERunOptions);
 
-    static_assert(ae_probe2 > 0, "VMX::AE core types must be complete and instantiable");
+    static_assert(ae_probe2 > 0, "AE::Engine core types must be complete and instantiable");
 
     // 轻量构造校验：默认构造简单实现，触发其构造函数语义检查（不进入 run() 协程体）。
     [[maybe_unused]] SimpleToolProvider g_dummy_tools;
@@ -110,16 +104,6 @@ namespace
     // §11 优雅退出：AEShutdown 编译期探针。
     // 不实例化（避免编译校验进程安装全局信号处理器）；以 sizeof + was_requested()
     // 静态访问触发类型完整性检查即可。
-    [[maybe_unused]] constexpr std::size_t g_shutdown_probe = sizeof(VMX::AE::GracefulShutdown);
-    [[maybe_unused]] bool g_shutdown_requested = VMX::AE::GracefulShutdown::was_requested();
-
-#ifdef VMX_AE_ENABLE_OTEL
-    [[maybe_unused]] AEOtelSink g_otel_sink; // 仅 OTEL 开启时校验真实 SDK 桥接
-#endif
-
-#ifdef VMX_AE_ENABLE_HTTP
-    // §9 Drogon 暴露层：仅 HTTP 开启时校验路由注册/鉴权/限流/SSE 链路可编译。
-    // （方法体引用 drogon 类型，包含即触发完整语义检查。）
-    [[maybe_unused]] AEHttpServer g_http;
-#endif
+    [[maybe_unused]] constexpr std::size_t g_shutdown_probe = sizeof(AE::Engine::GracefulShutdown);
+    [[maybe_unused]] bool g_shutdown_requested = AE::Engine::GracefulShutdown::was_requested();
 } // namespace

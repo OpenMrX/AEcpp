@@ -5,13 +5,13 @@
 ///
 /// @details
 /// 设计约束（关键）：
-/// - 本层【不 include】任何 Butler / MemoryStick 实现，保持 VMX::AE 完全解耦，
+/// - 本层【不 include】任何 Butler / MemoryStick 实现，保持 AE::Engine 完全解耦，
 /// 可独立编译并自跑单循环单 agent。Butler 完全体经 IAgentExecutor 单向消费。
 /// - token 粒度的 LlmDelta 是 AgentEngine 自身的 IR；与 Butler 的
 /// ButlerStreamEvent（事件粒度、回调式）是两套模型，由 Butler 侧薄适配器桥接，
-/// 禁止在 VMX::AE 内引入 ButlerStreamEvent 类型。
+/// 禁止在 AE::Engine 内引入 ButlerStreamEvent 类型。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 依赖：Core::Result / Core::Logger、nlohmann::json。
 
 #include <algorithm>
@@ -21,12 +21,12 @@
 #include <string_view>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "Core/Logger.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ------------------------------------------------------------ 类型化错误
@@ -360,4 +360,4 @@ namespace VMX::AE
         }
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

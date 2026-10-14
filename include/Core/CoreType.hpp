@@ -8,7 +8,7 @@
 #include <chrono>
 #include <string>
 
-namespace VMX::Core
+namespace AE::Core
 {
 
     /// 统一错误码：贯穿 `Core::Result`/`Core::Error` 的错误分类。
@@ -50,4 +50,4 @@ namespace VMX::Core
         Critical
     };
 
-} // namespace VMX::Core
+} // namespace AE::Core

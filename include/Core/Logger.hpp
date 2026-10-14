@@ -24,7 +24,7 @@
 #include <string_view>
 #include <utility>
 
-namespace VMX::Core
+namespace AE::Core
 {
 
     /// 全局日志门面（线程安全，标准库后端）。
@@ -253,4 +253,4 @@ namespace VMX::Core
         }
     };
 
-}  // namespace VMX::Core
+}  // namespace AE::Core

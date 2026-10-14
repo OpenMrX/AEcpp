@@ -2,3 +2,6 @@ build/
 out/
 *.log
 .vs/
+vcpkg/
+vcpkg_installed/
+plan.md

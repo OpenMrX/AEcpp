@@ -14,7 +14,7 @@
 /// - 不干预物理 KV Cache：C++ 核心只管业务层 Message History（见 §4.3.1），
 /// KV Cache 由推理引擎管理。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 
 #include <chrono>
 #include <deque>
@@ -37,7 +37,7 @@
 #include "AESanitize.hpp"
 #include "NullToolProvider.hpp"  // 无工具 provider，供 DCEE 未连时跑通 AgentEngine 链路
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     class AgentEngine : public IAgentExecutor
@@ -882,4 +882,4 @@ namespace VMX::AE
         CompressCallback m_compress_callback;    ///< 会话压缩回调（主机注入，滚动摘要）
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

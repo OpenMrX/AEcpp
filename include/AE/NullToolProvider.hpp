@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file NullToolProvider.hpp
-/// @brief 无工具的 IToolProvider 实现：供 Butler 在 DCEE 未连接（VMX_ENABLE_DCEE=OFF）
+/// @brief 无工具的 IToolProvider 实现：供 Butler 在 DCEE 未连接（AE_ENABLE_DCEE=OFF）
 ///
 /// @details
 /// 场景下跑通 TUI → Butler → AgentEngine 链路。
@@ -10,19 +10,19 @@
 /// has_tool==false 分支直接 co_yield Final 收尾（单轮 LLM，无工具循环）。
 /// 这正好满足「先跑通链路、工具能力后续接入」的阶段性目标。
 ///
-/// @note 所属命名空间：VMX::AE
-/// @note 设计约束：纯本地、零外部依赖（不依赖 DCEE），保证 VMX::AE 独立编译。
+/// @note 所属命名空间：AE::Engine
+/// @note 设计约束：纯本地、零外部依赖（不依赖 DCEE），保证 AE::Engine 独立编译。
 
 #include <string_view>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "Core/Error.hpp"
 #include "IAE.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // 无工具 provider：工具清单/ schema 均为空；execute 不可达（LLM 不会请求工具）。
@@ -53,4 +53,4 @@ namespace VMX::AE
         }
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

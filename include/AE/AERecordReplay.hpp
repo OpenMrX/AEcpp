@@ -5,7 +5,7 @@
 ///
 /// @details
 /// 设计约束（关键）：
-/// - 纯 VMX::AE 模块；仅依赖 Core::Result/Logger、AEType、AETelemetry，无额外第三方依赖。
+/// - 纯 AE::Engine 模块；仅依赖 Core::Result/Logger、AEType、AETelemetry，无额外第三方依赖。
 /// - 录制：把每次 run() 的「请求 → 各 LLM 原始响应（SSE 分块归一后的 deltas）→
 /// 工具调用与结果 → 最终产出」以 HAR 式 JSONL 落盘（每行一个事件）。密钥脱敏、
 /// prompt 可选脱敏（默认开启）。
@@ -15,7 +15,7 @@
 /// - 注入方式：AERunOptions（ReplayMode + 路径 + 遥测引用）经 AgentEngine 构造函数传入，
 /// run() 在 Replay 模式直接消费录制事件，不进入真实网络/工具执行。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 
 #include <algorithm>
 #include <chrono>
@@ -34,7 +34,7 @@
 #include "AEType.hpp"
 #include "AETelemetry.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     enum class ReplayMode
@@ -354,4 +354,4 @@ namespace VMX::AE
         std::size_t m_idx = 0;
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

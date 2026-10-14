@@ -21,17 +21,17 @@
 ///
 /// 纯数据变换，无 I/O、无异常、无裸 new/delete，不返回错误码（净化恒成功、统计经 out 参数回传）。
 ///
-/// @note 所属命名空间：VMX::AE
-/// @note 设计约束：纯 VMX::AE 模块，仅依赖标准库 + nlohmann（无 Butler/DCEE/Infrastructure）；
+/// @note 所属命名空间：AE::Engine
+/// @note 设计约束：纯 AE::Engine 模块，仅依赖标准库 + nlohmann（无 Butler/DCEE/Infrastructure）；
 
 #include <cctype>
 #include <cstddef>
 #include <string>
 #include <string_view>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // 单次净化的统计信息（供日志/遥测审计，判断是否发生截断/注入中和）。
@@ -208,4 +208,4 @@ namespace VMX::AE
         Options m_opt{};
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

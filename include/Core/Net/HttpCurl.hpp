@@ -5,9 +5,10 @@
 /// @details
 /// 提供阻塞式请求 curlPerform 与流式请求 curlStream（逐原始块回调 onData）。
 /// 头文件-only，内联实现；使用方链接目标需依赖 CURL::libcurl。
-/// libcurl 已是项目硬依赖（drogon / v1 均直接依赖），移除 cpr 后由本文件统一承载出向 HTTP 客户端。
+/// libcurl 为 VXAE 当前唯一 vcpkg 依赖（去留待定，替代候选见 plan.md §8.2），
+/// 由本文件统一承载出向 HTTP 客户端；替换传输层时仅重写本文件、接口签名不变。
 ///
-/// @note 命名空间：VMX::Core::Net。
+/// @note 命名空间：AE::Core::Net。
 
 #include <curl/curl.h>
 
@@ -21,7 +22,7 @@
 #include "Core/Result.hpp"
 #include "Core/Error.hpp"
 
-namespace VMX::Core::Net
+namespace AE::Core::Net
 {
 
     /// 出向 HTTP 请求描述（方法 / URL / 头 / 体 / 超时 / TLS 校验）。
@@ -229,4 +230,4 @@ namespace VMX::Core::Net
         return out;
     }
 
-} // namespace VMX::Core::Net
+} // namespace AE::Core::Net

@@ -13,7 +13,7 @@
 ///
 /// nlohmann::json、Core::Result。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 依赖：IAE.hpp（IToolProvider）、AESecurityGuard.hpp（AllowedToolsStore）、
 
 #include <flat_map>
@@ -24,13 +24,13 @@
 #include <string_view>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "IAE.hpp"
 #include "AESecurityGuard.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ================================================================
@@ -198,4 +198,4 @@ namespace VMX::AE
         ToolPolicyRegistry& registry_;
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

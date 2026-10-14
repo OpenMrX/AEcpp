@@ -14,7 +14,7 @@
 /// 代码按 ~3 chars/token 的加权估算，误差通常在 15% 以内
 /// - 探测失败时回退到模型名映射或默认值 8192
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 设计约束：
 
 #include <algorithm>
@@ -23,13 +23,13 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "Core/Logger.hpp"
 #include "Core/Net/HttpCurl.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     class TokenCounter
@@ -184,7 +184,7 @@ namespace VMX::AE
                         url += "/v1";
                 }
 
-                VMX::Core::Net::CurlRequest probeReq;
+                AE::Core::Net::CurlRequest probeReq;
                 probeReq.method = "GET";
                 probeReq.url = url + "/models";
                 probeReq.timeoutMs = 5000;
@@ -192,7 +192,7 @@ namespace VMX::AE
                 if (!api_key.empty())
                     probeReq.headers["Authorization"] = "Bearer " + std::string{api_key};
 
-                auto probeR = VMX::Core::Net::curlPerform(probeReq);
+                auto probeR = AE::Core::Net::curlPerform(probeReq);
                 const long probeCode = probeR.isError() ? 0 : probeR.value().statusCode;
                 if (probeR.isError() || probeCode != 200)
                 {
@@ -308,4 +308,4 @@ namespace VMX::AE
         }
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

@@ -5,7 +5,7 @@
 ///
 /// @details
 /// 设计纪律（关键）：
-/// - VMX::AE 核心【不自动】安装全局信号处理器，避免与宿主（Drogon / Butler /
+/// - AE::Engine 核心【不自动】安装全局信号处理器，避免与宿主（HTTP 服务 /
 /// 进程主循环）的信号处理冲突，也避免把信号语义强加给库消费者。
 /// - 仅暴露「取消入口」：AgentEngine::request_stop() / is_stop_requested()；
 /// 是否监听 SIGINT/SIGTERM、如何把信号映射到取消，由宿主决定。
@@ -22,14 +22,14 @@
 /// 对绝大多数部署可接受。若需严格安全，宿主应在主循环轮询 GracefulShutdown::
 /// was_requested() 并自行调用 engine.request_stop()，而非依赖回调的异步调用。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 
 #include <atomic>
 #include <csignal>
 #include <cstdlib>
 #include <functional>
 
-namespace VMX::AE
+namespace AE::Engine
 {
     class GracefulShutdown
     {
@@ -124,4 +124,4 @@ namespace VMX::AE
     inline std::atomic<int> GracefulShutdown::g_count{0};
     inline GracefulShutdown *GracefulShutdown::g_active{nullptr};
 
-} // namespace VMX::AE
+} // namespace AE::Engine

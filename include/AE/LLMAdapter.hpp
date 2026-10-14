@@ -8,20 +8,20 @@
 /// - LlmDelta 即统一中间表示 StreamEvent；各后端把自家原始流归一化为 LlmDelta，
 /// 上层 AgentEngine 只消费 IR，完全不感知后端差异。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 依赖：Core::Result、nlohmann::json、generator、AEType.hpp、StreamingLLMClient.hpp。
 
 #include <generator>
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "AEType.hpp"
 #include "StreamingLLMClient.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ------------------------------------------- LLM 适配层（多后端归一化）
@@ -102,4 +102,4 @@ namespace VMX::AE
         }
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

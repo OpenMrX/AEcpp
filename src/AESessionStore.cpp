@@ -1,5 +1,5 @@
 // =============================================================================
-//  VMX::AE — AESessionStore.cpp
+//  AE::Engine — AESessionStore.cpp
 //  会话 JSON 持久化实现。
 //  从 React+Session.cpp 迁移，适配 AE::IStateStore 接口。
 // =============================================================================
@@ -14,11 +14,11 @@
 
 #include "Core/Logger.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     AESessionStore::AESessionStore()
-        : dir_{".vmx_sessions"}
+        : dir_{".ae_sessions"}
     {
     }
 
@@ -151,4 +151,4 @@ namespace VMX::AE
         return oss.str();
     }
 
-} // namespace VMX::AE
+} // namespace AE::Engine

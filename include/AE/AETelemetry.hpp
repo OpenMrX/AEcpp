@@ -5,16 +5,16 @@
 ///
 /// @details
 /// 设计约束（关键）：
-/// - 纯 VMX::AE 模块；仅依赖 Core::Result/Logger、AEType 与标准库，保持核心解耦。
+/// - 纯 AE::Engine 模块；仅依赖 Core::Result/Logger、AEType 与标准库，保持核心解耦。
 /// - 采用「语义事件 + 可插拔 Sink」抽象：AE 业务代码只吐 AERecord，
 /// 具体落地（JSON 日志 / 内存聚合 / OTel SDK）由 Sink 实现，互不影响。
-/// → 这是 §4.6 要求的「OpenTelemetry 接入」的安全扩展点：OTel 走 AEOtel.hpp
-/// 可选 Sink，默认不链 opentelemetry-cpp，避免把重型 SDK 拖入 AE 默认构建。
+/// → 这是 §4.6 要求的「OpenTelemetry 接入」的安全扩展点：OTel 等重型后端由
+/// 消费方自行实现 IAEEventSink 接入，VXAE 本体不链 opentelemetry-cpp。
 /// - 每次 run() 生成随机 trace_id，贯穿 LLM 调用与工具执行（§4.6）。
 /// - 脱敏责任在调用方 / RecordingWriter：本门面不主动扫描 secrets，仅在
 /// StructuredLoggerSink 输出结构化 JSON 行时原样转义属性值。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 
 #include <chrono>
 #include <format>
@@ -32,7 +32,7 @@
 #include "Core/Logger.hpp"
 #include "Core/Result.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // 可观测阶段（语义化；OTel 侧映射为 span name）
@@ -289,4 +289,4 @@ namespace VMX::AE
         return std::format("{:016x}{:016x}", hi, lo);
     }
 
-}  // namespace VMX::AE
+}  // namespace AE::Engine

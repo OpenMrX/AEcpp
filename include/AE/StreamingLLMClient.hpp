@@ -6,9 +6,9 @@
 /// @details
 /// 设计约束（关键）：
 /// - 不 include Butler / MemoryStick；LlmDelta（见 AEType.hpp）为统一 IR。
-/// - TLS 校验默认开启，API Key 用 VMX::Core::Security::SecureString（不在内存裸存）。
+/// - TLS 校验默认开启，API Key 用 AE::Core::Security::SecureString（不在内存裸存）。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 依赖：libcurl, nlohmann, Core::Result/Logger。
 
 #include <algorithm>
@@ -28,7 +28,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Security/SecureString.hpp"
 #include "Core/Net/SseParser.hpp"
@@ -38,18 +38,18 @@
 #include "Core/Logger.hpp"
 #include "AEType.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ---------------------------------------------------- 流式 LLM 客户端
-    // 设计：libcurl 驱动 SSE（WriteCallback -> VMX::Core::Net::SseParser 标准解析），
+    // 设计：libcurl 驱动 SSE（WriteCallback -> AE::Core::Net::SseParser 标准解析），
     //       每个 SSE 事件的 data 用 nlohmann::json::parse 解析；
     //       tool_call 的 arguments 跨 chunk 残缺，按 index 累加，流结束后整体组装。
     class StreamingLLMClient
     {
     public:
         StreamingLLMClient(std::string endpoint,
-                           VMX::Core::Security::SecureString api_key,
+                           AE::Core::Security::SecureString api_key,
                            int timeout_ms = 30000,
                            int max_retries = 3)
             : m_endpoint(std::move(endpoint)),
@@ -198,7 +198,7 @@ namespace VMX::AE
         auto do_request_cb(const nlohmann::json &body, std::function<void(LlmDelta)> onDelta) -> TurnOutcome
         {
             TurnOutcome out;
-            VMX::Core::Net::SseParser sse;
+            AE::Core::Net::SseParser sse;
 
             // 按 tool_call index 累加残缺 arguments / id / name
             std::unordered_map<std::size_t, std::string> arg_buffers;
@@ -363,7 +363,7 @@ namespace VMX::AE
             };
 
             std::string streamBody;
-            VMX::Core::Net::CurlRequest sseReq;
+            AE::Core::Net::CurlRequest sseReq;
             sseReq.method = "POST";
             sseReq.url = m_endpoint;
             sseReq.body = body.dump();
@@ -377,7 +377,7 @@ namespace VMX::AE
                 m_endpoint, sseReq.body.substr(0, 500));
             // TLS 校验默认开启（verifySsl=true）；如需固定 CA 见 Core/Net/HttpCurl.hpp。
 
-            auto sseResult = VMX::Core::Net::curlStream(
+            auto sseResult = AE::Core::Net::curlStream(
                 sseReq,
                 [&sse, &streamBody, &parse_chunk, this](std::string_view data) -> bool
                 {
@@ -896,7 +896,7 @@ namespace VMX::AE
                 onDelta(std::move(d));
             };
 
-            VMX::Core::Net::CurlRequest nsReq;
+            AE::Core::Net::CurlRequest nsReq;
             nsReq.method = "POST";
             nsReq.url = m_endpoint;
             nsReq.body = body.dump();
@@ -909,7 +909,7 @@ namespace VMX::AE
                 "[AE:LLM] non-stream POST {} body={}",
                 m_endpoint, nsReq.body.substr(0, 500));
 
-            auto nsResult = VMX::Core::Net::curlPerform(nsReq);
+            auto nsResult = AE::Core::Net::curlPerform(nsReq);
             if (nsResult.isError())
             {
                 out.network_error = true;
@@ -919,7 +919,7 @@ namespace VMX::AE
                 out.error = "LLM transport error";
                 return out;
             }
-            const VMX::Core::Net::CurlResponse &resp = nsResult.value();
+            const AE::Core::Net::CurlResponse &resp = nsResult.value();
             out.status_code = static_cast<long>(resp.statusCode);
             out.network_error = false;
 
@@ -1055,10 +1055,10 @@ namespace VMX::AE
         }
 
         std::string m_endpoint;
-        VMX::Core::Security::SecureString m_api_key;
+        AE::Core::Security::SecureString m_api_key;
         int m_timeout_ms;
         int m_max_retries;
         std::mt19937 m_rng{std::random_device{}()};
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

@@ -12,7 +12,7 @@
 /// - 底层存储：每个会话一个 .json 文件，原子写入（temp file + rename）。
 /// - 线程安全：std::mutex 保护文件 I/O。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 依赖：IAE.hpp（IStateStore）、nlohmann::json、Core::Result。
 
 #include <filesystem>
@@ -21,12 +21,12 @@
 #include <string_view>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "IAE.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ================================================================
@@ -75,4 +75,4 @@ namespace VMX::AE
         mutable std::mutex mutex_;
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

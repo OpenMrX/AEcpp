@@ -6,13 +6,13 @@
 /// 构造 / 拷贝 / 移动 / 析构时清零底层缓冲，避免明文密钥长期驻留内存。
 /// 仅通过显式转换暴露明文，调用边界（如注入 Bearer / 构造请求体）才取出。
 ///
-/// @note 头文件-only，无链接依赖。命名空间：VMX::Core::Security。
+/// @note 头文件-only，无链接依赖。命名空间：AE::Core::Security。
 
 #include <algorithm>
 #include <string>
 #include <string_view>
 
-namespace VMX::Core::Security
+namespace AE::Core::Security
 {
 
     class SecureString
@@ -90,4 +90,4 @@ namespace VMX::Core::Security
         std::string m_data;
     };
 
-} // namespace VMX::Core::Security
+} // namespace AE::Core::Security

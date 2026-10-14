@@ -1,0 +1,58 @@
+{
+  "version": 7,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "AE_BUILD_DEMO": "ON"
+      }
+    },
+    {
+      "name": "default",
+      "displayName": "default (lib + FTXUI demo)",
+      "description": "vcpkg manifest 工具链；Debug/Release 双配置（Ninja Multi-Config）",
+      "inherits": "base"
+    },
+    {
+      "name": "lib-only",
+      "displayName": "lib-only (no demo)",
+      "description": "仅核心库 vxae/vxae_check，不拉取 ftxui",
+      "inherits": "base",
+      "cacheVariables": {
+        "AE_BUILD_DEMO": "OFF"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug (all targets)",
+      "configurePreset": "default",
+      "configuration": "Debug",
+      "targets": ["vxae", "vxae_check", "vxae_demo"]
+    },
+    {
+      "name": "release",
+      "displayName": "Release (all targets)",
+      "configurePreset": "default",
+      "configuration": "Release",
+      "targets": ["vxae", "vxae_check", "vxae_demo"]
+    },
+    {
+      "name": "lib-debug",
+      "displayName": "Debug (library only)",
+      "configurePreset": "lib-only",
+      "configuration": "Debug",
+      "targets": ["vxae", "vxae_check"]
+    }
+  ]
+}

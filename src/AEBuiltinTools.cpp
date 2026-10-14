@@ -1,5 +1,5 @@
 // =============================================================================
-//  VMX::AE — AEBuiltinTools.cpp
+//  AE::Engine — AEBuiltinTools.cpp
 //  内置工具集实现：FileTools、GitTools、ProcessRunner。
 //  从 React 迁移，适配 AE::IToolProvider 接口。
 // =============================================================================
@@ -19,7 +19,7 @@
 #define pclose _pclose
 #endif
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ================================================================
@@ -425,4 +425,4 @@ namespace VMX::AE
         return provider;
     }
 
-} // namespace VMX::AE
+} // namespace AE::Engine

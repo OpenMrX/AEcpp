@@ -5,17 +5,17 @@
 ///
 /// @details
 /// 设计约束（关键）：
-/// - 纯 VMX::AE 模块，不依赖 Butler / DCEE / Infrastructure，保持核心解耦可独立编译；
+/// - 纯 AE::Engine 模块，不依赖 Butler / DCEE / Infrastructure，保持核心解耦可独立编译；
 /// VXAE 独立版：文件解析改用既装的 nlohmann::json（JSON 配置过渡方案，去除 yaml-cpp
 /// 依赖；格式定性后期再调整）。
-/// - 密钥绝不硬编码、绝不入日志：从环境变量（前缀 VMX_AE_）或挂载的 secrets 文件读取，
-/// 存入 VMX::Core::Security::SecureString（析构时清零内存）；任何日志只记录「是否存在」而非明文。
+/// - 密钥绝不硬编码、绝不入日志：从环境变量（前缀 AE_）或挂载的 secrets 文件读取，
+/// 存入 AE::Core::Security::SecureString（析构时清零内存）；任何日志只记录「是否存在」而非明文。
 /// - endpoint 等连接参数外部化；配置缺失 → Core::Result::Error，启动即失败（fail-fast），
 /// 不允许「静默用默认值连生产」。
 /// - 与 §4.7 接线：egress 白名单/模式直接构建 EgressPolicy（权限门默认拒绝）。
 /// - 与 §6 接线：AEConfigProvider 以 shared_mutex + 不可变快照支持配置热加载。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 
 #include <cctype>
 #include <charconv>
@@ -31,7 +31,7 @@
 #include <string_view>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 #include "Core/Security/SecureString.hpp"
 
 #include "AEManager.hpp"   // StreamingLLMClient（config → client 工厂）
@@ -39,7 +39,7 @@
 #include "Core/Logger.hpp"
 #include "Core/Result.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ---------------------------------------------------- 结构化配置
@@ -87,7 +87,7 @@ namespace VMX::AE
         Context context;
 
         // 取密钥（SecureString）。绝不以明文形式拷贝/打印。
-        [[nodiscard]] auto api_key() const -> const VMX::Core::Security::SecureString &
+        [[nodiscard]] auto api_key() const -> const AE::Core::Security::SecureString &
         {
             return m_api_key;
         }
@@ -97,8 +97,8 @@ namespace VMX::AE
         }
 
         // ============================================ 加载入口
-        // 1) 仅环境变量（前缀默认 "VMX_AE_"）；密钥从 env / secrets 文件注入。
-        static auto from_env(std::string_view prefix = "VMX_AE_") -> Core::Result<AEConfig>
+        // 1) 仅环境变量（前缀默认 "AE_"）；密钥从 env / secrets 文件注入。
+        static auto from_env(std::string_view prefix = "AE_") -> Core::Result<AEConfig>
         {
             AEConfig cfg;
             apply_env_overrides(cfg, prefix);
@@ -143,7 +143,7 @@ namespace VMX::AE
         }
 
         // 4) 组合：先文件（可选）再环境变量覆盖（env 优先），fail-fast 校验。
-        static auto load(std::optional<std::string> file, std::string_view env_prefix = "VMX_AE_")
+        static auto load(std::optional<std::string> file, std::string_view env_prefix = "AE_")
             -> Core::Result<AEConfig>
         {
             AEConfig cfg;
@@ -167,7 +167,7 @@ namespace VMX::AE
         {
             if (llm.endpoint.empty())
                 return Core::Result<void>::Error(
-                    Core::Error{"AEConfig: llm.endpoint is required (set VMX_AE_ENDPOINT or llm.endpoint in config)"});
+                    Core::Error{"AEConfig: llm.endpoint is required (set AE_ENDPOINT or llm.endpoint in config)"});
             if (llm.timeout_ms <= 0)
                 Core::Logger::getInstance().warningFmt("[AE:Config] timeout_ms={} 非法，夹紧到 30000", llm.timeout_ms);
             if (llm.max_retries < 0)
@@ -203,7 +203,7 @@ namespace VMX::AE
         }
 
     private:
-        VMX::Core::Security::SecureString m_api_key;  // 密钥 NEVER 明文落结构体/日志
+        AE::Core::Security::SecureString m_api_key;  // 密钥 NEVER 明文落结构体/日志
 
         // ----- JSON → 结构体（支持扁平键与 llm:/budget:/egress: 嵌套）-----
         static void fill_from_json(AEConfig &cfg, const nlohmann::json &root)
@@ -245,7 +245,7 @@ namespace VMX::AE
             {
                 const std::string k = root["api_key"].get<std::string>();
                 if (!k.empty())
-                    cfg.m_api_key = VMX::Core::Security::SecureString{k};
+                    cfg.m_api_key = AE::Core::Security::SecureString{k};
             }
         }
 
@@ -300,15 +300,15 @@ namespace VMX::AE
                 cfg.context.token_safety_margin_pct =
                     static_cast<std::size_t>(env_int(*v, static_cast<long>(cfg.context.token_safety_margin_pct)));
 
-            // 密钥：VMX_AE_API_KEY 直接给；VMX_AE_API_KEY_FILE 指向挂载的 secrets 文件（内容即密钥）。
+            // 密钥：AE_API_KEY 直接给；AE_API_KEY_FILE 指向挂载的 secrets 文件（内容即密钥）。
             if (auto v = ev("API_KEY"))
             {
-                cfg.m_api_key = VMX::Core::Security::SecureString{*v};
+                cfg.m_api_key = AE::Core::Security::SecureString{*v};
             }
             else if (auto f = ev("API_KEY_FILE"))
             {
                 if (auto content = read_secret_file(*f))
-                    cfg.m_api_key = VMX::Core::Security::SecureString{*content};
+                    cfg.m_api_key = AE::Core::Security::SecureString{*content};
             }
         }
 
@@ -445,7 +445,7 @@ namespace VMX::AE
         }
 
         // 热加载：重新读取文件 + 环境变量覆盖，校验通过后原子替换快照。
-        auto reload(std::optional<std::string> file, std::string_view env_prefix = "VMX_AE_") -> Core::Result<void>
+        auto reload(std::optional<std::string> file, std::string_view env_prefix = "AE_") -> Core::Result<void>
         {
             auto r = AEConfig::load(std::move(file), env_prefix);
             if (r.isError())
@@ -462,4 +462,4 @@ namespace VMX::AE
         std::shared_ptr<const AEConfig> m_snapshot;
     };
 
-}  // namespace VMX::AE
+}  // namespace AE::Engine

@@ -6,11 +6,11 @@
 /// @details
 /// - 内部自动管理 VllmAdapter、SimpleContextSource（可选）、AgentEngine 的生命周期
 /// - 所有依赖用智能指针或引用管理，无裸 new/delete
-/// - 遵循 VMX::AE 命名空间与 Core::Result 错误处理规范
+/// - 遵循 AE::Engine 命名空间与 Core::Result 错误处理规范
 /// - 支持自动从 LM Studio / vLLM 等 OpenAI 兼容 API 探测 context window
 /// - 支持本地近似 token 计数（TokenCounter），在 LLM 不返回 usage 时使用
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 设计约束：
 
 #include <deque>
@@ -20,7 +20,7 @@
 #include <string_view>
 #include <optional>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "AEType.hpp"
@@ -30,7 +30,7 @@
 #include "StreamingLLMClient.hpp"
 #include "TokenCounter.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     class AEChatHelper
@@ -313,4 +313,4 @@ namespace VMX::AE
         std::optional<TokenCounter::ModelInfo> m_modelInfo;
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

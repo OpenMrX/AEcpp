@@ -10,11 +10,11 @@
 /// 可独立编译并自跑单循环单 agent。
 /// - DCEE / vLLmProvide::ContextManager 的适配器（把项目基建接到 IToolProvider /
 /// IContextSource）落在独立的 AEInfra.hpp，避免本文件引入外部模块头，
-/// 保证 VMX::AE 核心可独立编译。
+/// 保证 AE::Engine 核心可独立编译。
 /// - Butler 完全体经 IAgentExecutor 单向消费；Butler 的 LLMRouter / ToolRegistry
-/// 可桥接到这些抽象，绝不允许反向依赖 VMX::AE 的实现文件。
+/// 可桥接到这些抽象，绝不允许反向依赖 AE::Engine 的实现文件。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 
 #include <deque>
 #include <exception>
@@ -27,13 +27,13 @@
 #include <unordered_set>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
 #include "Core/Logger.hpp"
 #include "AEType.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ============================================================ 依赖注入抽象
@@ -232,7 +232,7 @@ namespace VMX::AE
     };
 
     // ============================================================ 最小本地实现
-    // 让 VMX::AE 可独立编译自跑（无 DCEE / 无 Butler）。生产接入项目基建时，
+    // 让 AE::Engine 可独立编译自跑（无 DCEE / 无 Butler）。生产接入项目基建时，
     // 用 DCEE / ContextManager 适配器（AEInfra.hpp）替换即可，AgentEngine 代码无需改动。
 
     class SimpleContextSource : public IContextSource
@@ -377,4 +377,4 @@ namespace VMX::AE
         std::unordered_map<std::string, std::string> m_data;
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

@@ -4,9 +4,9 @@
 /// @brief 安全组件：路径验证、Shell 注入防护、持久化工具权限存储。
 ///
 /// @details
-/// 从 React+Security 迁移，命名空间改为 VMX::AE。
+/// 从 React+Security 迁移，命名空间改为 AE::Engine。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 依赖：Core::Result、nlohmann::json（AllowedToolsStore 持久化）、Core::Logger。
 
 #include <memory>
@@ -17,7 +17,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ================================================================
@@ -61,4 +61,4 @@ namespace VMX::AE
         std::unordered_set<std::string> allowed_;
     };
 
-} // namespace VMX::AE
+} // namespace AE::Engine

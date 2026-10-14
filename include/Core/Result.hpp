@@ -28,7 +28,7 @@
 #include <utility>
 #include <stdexcept>
 
-namespace VMX::Core
+namespace AE::Core
 {
     // 类型别名：类 `Result` 内有一个同名的静态方法 `Error`，会遮蔽类型 `Error`。
     // 此处为类型引用提供无冲突别名，避免 `Error` 被方法名遮蔽导致编译失败。
@@ -351,7 +351,7 @@ namespace VMX::Core
         using Base::Base;
     };
 
-} // namespace VMX::Core
+} // namespace AE::Core
 
 #define MXDRO_RETURN_IF_ERROR(result)                                     \
     do                                                                    \
@@ -359,7 +359,7 @@ namespace VMX::Core
         auto _mxdro_result = (result);                                    \
         if (_mxdro_result.isError())                                      \
         {                                                                 \
-            return VMX::Core::Result<void>::Error(_mxdro_result.error()); \
+            return AE::Core::Result<void>::Error(_mxdro_result.error()); \
         }                                                                 \
     } while (0)
 
@@ -369,6 +369,6 @@ namespace VMX::Core
         auto _mxdro_result = (result);                                                                             \
         if (_mxdro_result.isError())                                                                               \
         {                                                                                                          \
-            return VMX::Core::Result<std::decay_t<decltype(_mxdro_result.value())>>::Error(_mxdro_result.error()); \
+            return AE::Core::Result<std::decay_t<decltype(_mxdro_result.value())>>::Error(_mxdro_result.error()); \
         }                                                                                                          \
     } while (0)

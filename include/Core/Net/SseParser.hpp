@@ -7,14 +7,14 @@
 /// ':' 开头为注释）切分，逐事件回调。兼容被 chunk 边界切断的不完整行/事件。
 /// 语义对齐 cpr::ServerSentEventParser：每个事件回调给出 (event, data)。
 ///
-/// @note 头文件-only，无链接依赖。命名空间：VMX::Core::Net。
+/// @note 头文件-only，无链接依赖。命名空间：AE::Core::Net。
 
 #include <cstddef>
 #include <functional>
 #include <string>
 #include <string_view>
 
-namespace VMX::Core::Net
+namespace AE::Core::Net
 {
 
     /// SSE 增量解析器：feed() 多次调用，逐完整事件触发 cb(event, data)。
@@ -123,4 +123,4 @@ namespace VMX::Core::Net
         std::string m_id;
     };
 
-} // namespace VMX::Core::Net
+} // namespace AE::Core::Net

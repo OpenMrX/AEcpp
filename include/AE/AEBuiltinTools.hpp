@@ -9,7 +9,7 @@
 /// 使用方式：调用 AEBuiltinTools::registerAll(toolProvider) 一键注册全部内置工具。
 /// 也可单独注册各工具类。
 ///
-/// @note 所属命名空间：VMX::AE
+/// @note 所属命名空间：AE::Engine
 /// @note 依赖：IAE.hpp（IToolProvider）、nlohmann::json、Core::Result。
 
 #include <cstddef>
@@ -20,7 +20,7 @@
 #include "Core/Result.hpp"
 #include "IAE.hpp"
 
-namespace VMX::AE
+namespace AE::Engine
 {
 
     // ================================================================
@@ -99,4 +99,4 @@ namespace VMX::AE
     // 可与 DceeToolProvider 组合使用，或独立用于轻量场景。
     [[nodiscard]] auto createBuiltinProvider() -> std::unique_ptr<IToolProvider>;
 
-} // namespace VMX::AE
+} // namespace AE::Engine

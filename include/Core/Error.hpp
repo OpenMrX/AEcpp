@@ -12,7 +12,7 @@
 #include <string>
 #include <utility>
 
-namespace VMX::Core
+namespace AE::Core
 {
 
     /// 统一错误：码 + 消息 + 可选 cause 链。值语义，可拷贝。
@@ -96,4 +96,4 @@ namespace VMX::Core
         std::shared_ptr<Error> m_cause;        ///< 原因链（可选）
     };
 
-} // namespace VMX::Core
+} // namespace AE::Core
