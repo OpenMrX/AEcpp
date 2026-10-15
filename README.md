@@ -1,6 +1,6 @@
 # AE::Engine (VXAE)
 
-独立、跨平台、C++23 的 **Agent Engine** 库：LLM 流式对话 + 多轮工具调用主循环 + 安全/策略/会话/遥测基元，附带基于 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 的终端聊天 Demo。
+独立、跨平台、C++26 的 **Agent Engine** 库：LLM 流式对话 + 多轮工具调用主循环 + 安全/策略/会话/遥测基元，附带基于 [FTXUI](https://github.com/ArthurSonzogni/FTXUI) 的终端聊天 Demo。
 
 - 命名空间：`AE::Engine`（引擎）、`AE::Core`（自带最小基座）、`AE::TUI`（demo）
 - 零项目耦合：不依赖任何宿主工程；运行时第三方依赖**只有 libcurl**
@@ -40,33 +40,48 @@
 | [FTXUI](https://ftxui.cpp.dev/) | demo 终端 UI（仅 `vxae_demo` 消费，核心库不受影响） | Apache-2.0 | [ArthurSonzogni/FTXUI](https://github.com/ArthurSonzogni/FTXUI) |
 | [vcpkg](https://vcpkg.io/) | 依赖管理（manifest 模式，见 `vcpkg.json`） | MIT | [microsoft/vcpkg](https://github.com/microsoft/vcpkg) |
 
-同时致谢 C++23 标准库（`std::expected` / `std::generator` / `std::print` / `std::jthread`）让本库得以去掉 spdlog/fmt/yaml-cpp/stduuid 等传统依赖。
+同时致谢 C++26 标准库（`std::expected` / `std::generator` / `std::print` / `std::jthread`）让本库得以去掉 spdlog/fmt/yaml-cpp/stduuid 等传统依赖。
 demo 的 TUI 布局移植自本团队前作 `puppeteer-vmrx`，接线层已完全重写为本库 API。
 
 ## 构建
 
-前置：CMake ≥ 3.25、Ninja、MSVC 2026(18)/GCC 14+/Clang 18+，仓库内 `vcpkg/` checkout（或自备 vcpkg 并改 `CMakePresets.json` 中工具链路径）。
+前置：CMake ≥ 3.25、Ninja、**LLVM 22+（clang-cl 作为前端 / lld-link 作为后端）**，仓库内 `vcpkg/` checkout（或自备 vcpkg 并改 `CMakePresets.json` 中工具链路径）。
+标准固定在 **C++26**（各目标 `CXX_STANDARD 26`；clang-cl 下 CMake 映射为 `-std:c++latest`，实测 `__cplusplus == 202400`）。
+
+> 工具链走 MSVC ABI（`x86_64-pc-windows-msvc`），因此 vcpkg 的 `x64-windows` 预编译依赖可原样复用，无需重建。
+> MSVC 自带工具链不再参与：归档用 `llvm-lib`，链接用 `lld-link`，资源/清单用 `llvm-rc` / `llvm-mt`。
 
 ### 使用 CMake Presets（推荐，兼容 IDE CMake Tools 插件）
 
 ```bash
-cmake --preset default          # 配置：核心库 + demo（Ninja Multi-Config）
-cmake --build --preset debug    # 构建 vxae / vxae_check / vxae_demo（Debug）
-cmake --build --preset release  # Release
-cmake --preset lib-only && cmake --build --preset lib-debug   # 仅核心库，不拉 ftxui
+cmake --preset llvm          # 配置：clang-cl + lld-link + C++26，核心库 + demo
+cmake --build --preset llvm-debug     # Debug：vxae / vxae_check / vxae_demo
+cmake --build --preset llvm-release   # Release
+cmake --preset llvm-lib-only && cmake --build --preset llvm-lib-debug  # 仅核心库，不拉 ftxui
 ```
 
-产物位于 `build/default/{Debug,Release}/`。
+产物位于 `build/llvm/{Debug,Release}/`（demo：`build/llvm/demo/Debug/vxae_demo.exe`）。
+
+`default` / `lib-only` 两组 preset 仍保持“环境默认编译器（MSVC cl）”的行为，便于对照。
 
 ### 手动命令（不经 preset）
 
 ```bash
-cmake -S . -B build -G "Ninja Multi-Config" \
-  -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake -DAE_BUILD_DEMO=ON
-cmake --build build --config Debug --target vxae_demo
+cmake -S . -B build/llvm -G "Ninja Multi-Config" `
+  -DCMAKE_TOOLCHAIN_FILE=vcpkg/scripts/buildsystems/vcpkg.cmake -DAE_BUILD_DEMO=ON `
+  -DCMAKE_CXX_COMPILER="C:/Program Files/LLVM/bin/clang-cl.exe" `
+  -DCMAKE_LINKER="C:/Program Files/LLVM/bin/lld-link.exe" `
+  -DCMAKE_AR="C:/Program Files/LLVM/bin/llvm-lib.exe" `
+  -DCMAKE_RC_COMPILER="C:/Program Files/LLVM/bin/llvm-rc.exe" `
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build build/llvm --config Debug --target vxae_demo
 ```
 
 首次 configure 时 vcpkg manifest 会自动解析并构建 `curl`、`ftxui`（Linux/macOS 从源码构建，耗时视机器而定）。
+
+### clangd
+
+preset 已开启 `CMAKE_EXPORT_COMPILE_COMMANDS`，编译数据库落在 `build/llvm/compile_commands.json`；仓库根目录 `.clangd` 已通过 `CompilationDatabase` 指向它，新版 clangd（本仓验证版本 22.1.8）开箱可用，无需 `--compile-commands-dir`。
 
 ### 目标一览
 
@@ -99,8 +114,8 @@ cmake --build build --config Debug --target vxae_demo
 ### 运行
 
 ```bash
-build/default/Debug/vxae_demo        # Linux/macOS
-build\default\Debug\vxae_demo.exe    # Windows
+build/llvm/Debug/vxae_demo        # Linux/macOS
+build\llvm\Debug\vxae_demo.exe    # Windows
 ```
 
 - **chat 模式（默认）**：单轮流式对话（`StreamingLLMClient`），SSE 增量/思考块/真实 token 统计；
@@ -113,7 +128,7 @@ build\default\Debug\vxae_demo.exe    # Windows
 ```cmake
 add_subdirectory(external/vxae)            # 或 git submodule / FetchContent
 target_link_libraries(your_target PRIVATE vxae)
-target_compile_features(your_target PRIVATE cxx_std_23)
+target_compile_features(your_target PRIVATE cxx_std_26)
 ```
 
 ```cpp
@@ -122,7 +137,7 @@ target_compile_features(your_target PRIVATE cxx_std_23)
 #include "AE/AEConfig.hpp"           // JSON 配置
 ```
 
-要点：C++23 必需（MSVC 映射 `/std:c++latest`）；include 根为 `include/`、`include/AE/`、`vendor/`；`UUID_SYSTEM_GENERATOR`/`Ole32` 等历史包袱已不存在。
+要点：C++26 必需（clang-cl 映射 `-std:c++latest`）；include 根为 `include/`、`include/AE/`、`vendor/`；`UUID_SYSTEM_GENERATOR`/`Ole32` 等历史包袱已不存在。
 
 ## 许可
 

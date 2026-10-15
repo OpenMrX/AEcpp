@@ -1,0 +1,10 @@
+# clangd 索引配置（LLVM 22）
+# compile_commands.json 由 CMake preset `llvm` 生成于 build/llvm/
+CompileFlags:
+  CompilationDatabase: build/llvm
+  # clang-cl 需要 Windows 目标才能正确吃到 MSVC STL/WinSDK 头文件
+  Add: [--target=x86_64-pc-windows-msvc]
+
+Diagnostics:
+  # 屏蔽 MSVC CRT 弃用告警（getenv/gmtime/localtime 等），与构建输出保持一致的处理
+  Suppress: "-Wdeprecated-declarations"

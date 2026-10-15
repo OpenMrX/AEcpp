@@ -29,14 +29,14 @@ target_link_libraries(vxae_tui PUBLIC
     ftxui::component
 )
 
-if(MSVC)
+# clang-cl 前端 + MSVC ABI：这里同样命中（MSVC 或 clang 的 MSVC 前端变体）
+if(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     # 与 vxae 一致：源码 UTF-8 无 BOM。
-    target_compile_options(vxae_tui PRIVATE /utf-8)
     target_compile_options(vxae_tui PUBLIC /utf-8)
 endif()
 
 set_target_properties(vxae_tui PROPERTIES
-    CXX_STANDARD 23
+    CXX_STANDARD 26
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )
@@ -46,7 +46,7 @@ add_executable(vxae_demo main.cpp)
 target_link_libraries(vxae_demo PRIVATE vxae_tui)
 
 set_target_properties(vxae_demo PROPERTIES
-    CXX_STANDARD 23
+    CXX_STANDARD 26
     CXX_STANDARD_REQUIRED ON
     CXX_EXTENSIONS OFF
 )

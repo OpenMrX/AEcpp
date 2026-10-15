@@ -17,22 +17,72 @@
       }
     },
     {
+      "name": "base-llvm",
+      "hidden": true,
+      "inherits": "base",
+      "description": "LLVM 22 工具链：clang-cl 前端 + lld-link 后端（MSVC ABI，C++26）",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang-cl.exe",
+        "CMAKE_AR": "C:/Program Files/LLVM/bin/llvm-lib.exe",
+        "CMAKE_LINKER": "C:/Program Files/LLVM/bin/lld-link.exe",
+        "CMAKE_RC_COMPILER": "C:/Program Files/LLVM/bin/llvm-rc.exe",
+        "CMAKE_MT": "C:/Program Files/LLVM/bin/llvm-mt.exe",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
       "name": "default",
-      "displayName": "default (lib + FTXUI demo)",
-      "description": "vcpkg manifest 工具链；Debug/Release 双配置（Ninja Multi-Config）",
+      "displayName": "default (MSVC: lib + FTXUI demo)",
+      "description": "沿用环境默认编译器（MSVC cl）；Debug/Release 双配置（Ninja Multi-Config）",
       "inherits": "base"
     },
     {
+      "name": "llvm",
+      "displayName": "llvm (clang-cl + lld-link: lib + FTXUI demo)",
+      "description": "推荐：LLVM 22 作为前后端，C++26；Debug/Release 双配置（Ninja Multi-Config）",
+      "inherits": "base-llvm"
+    },
+    {
       "name": "lib-only",
-      "displayName": "lib-only (no demo)",
+      "displayName": "lib-only (MSVC, no demo)",
       "description": "仅核心库 vxae/vxae_check，不拉取 ftxui",
       "inherits": "base",
+      "cacheVariables": {
+        "AE_BUILD_DEMO": "OFF"
+      }
+    },
+    {
+      "name": "llvm-lib-only",
+      "displayName": "llvm-lib-only (clang-cl + lld-link, no demo)",
+      "description": "LLVM 前后端 + C++26，仅核心库 vxae/vxae_check",
+      "inherits": "base-llvm",
       "cacheVariables": {
         "AE_BUILD_DEMO": "OFF"
       }
     }
   ],
   "buildPresets": [
+    {
+      "name": "llvm-debug",
+      "displayName": "LLVM Debug (all targets)",
+      "configurePreset": "llvm",
+      "configuration": "Debug",
+      "targets": ["vxae", "vxae_check", "vxae_demo"]
+    },
+    {
+      "name": "llvm-release",
+      "displayName": "LLVM Release (all targets)",
+      "configurePreset": "llvm",
+      "configuration": "Release",
+      "targets": ["vxae", "vxae_check", "vxae_demo"]
+    },
+    {
+      "name": "llvm-lib-debug",
+      "displayName": "LLVM Debug (library only)",
+      "configurePreset": "llvm-lib-only",
+      "configuration": "Debug",
+      "targets": ["vxae", "vxae_check"]
+    },
     {
       "name": "debug",
       "displayName": "Debug (all targets)",
