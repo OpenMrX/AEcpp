@@ -1,10 +1,16 @@
-# clangd 索引配置（LLVM 22）
-# compile_commands.json 由 CMake preset `llvm` 生成于 build/llvm/
+# clangd 配置（编辑器的 clangd 扩展已通过 --compile-commands-dir 指向 build/llvm 的编译数据库）
+
+# 对 modules/ 下的 .cppm：当前未接入构建（见 Docs/PLAN_module_migration.md §11），
+# 这里补充项目自有包含路径，使内部 import/头能解析（第三方全局片段头仍需 vcpkg 路径）。
+If:
+  PathMatch: modules/.*\.cppm
 CompileFlags:
-  CompilationDatabase: build/llvm
-  # clang-cl 需要 Windows 目标才能正确吃到 MSVC STL/WinSDK 头文件
-  Add: [--target=x86_64-pc-windows-msvc]
+  Add:
+    - "-Iinclude"
+    - "-Ivendor"
+    - "-std=c++20"
+  Compiler: clang-cl.exe
 
 Diagnostics:
-  # 屏蔽 MSVC CRT 弃用告警（getenv/gmtime/localtime 等），与构建输出保持一致的处理
-  Suppress: "-Wdeprecated-declarations"
+  # 关闭“未使用头文件”严格检查，避免 vcpkg/MSVC 头带来噪音
+  UnusedIncludes: None

@@ -30,16 +30,16 @@ find_package(CURL CONFIG REQUIRED)
 # vxae —— 核心 STATIC 库
 # ------------------------------------------------------------
 add_library(vxae STATIC
-    src/AESecurityGuard.cpp
-    src/AEBuiltinTools.cpp
-    src/AEToolPolicy.cpp
-    src/AESessionStore.cpp
+    src/AE/AESecurityGuard.cpp
+    src/AE/AEBuiltinTools.cpp
+    src/AE/AEToolPolicy.cpp
+    src/AE/AESessionStore.cpp
 )
 
 target_include_directories(vxae PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/include/AE
-    ${CMAKE_CURRENT_SOURCE_DIR}/vendor
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/AE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vendor
 )
 
 target_link_libraries(vxae PUBLIC

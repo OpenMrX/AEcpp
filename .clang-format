@@ -1,0 +1,22 @@
+---
+# clang-format 风格（匹配现有代码：4 空格缩进、大括号同行）
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: false
+
+SpaceBeforeParens: ControlStatements
+PointerAlignment: Left
+NamespaceIndentation: None
+FixNamespaceComments: true
+
+SortIncludes: CaseInsensitive

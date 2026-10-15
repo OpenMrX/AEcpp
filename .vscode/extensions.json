@@ -1,0 +1,6 @@
+{
+  "recommendations": [
+    "llvm-vs-code.clangd",
+    "ms-vscode.cmake-tools"
+  ]
+}

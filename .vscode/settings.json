@@ -1,0 +1,36 @@
+{
+  // ===== clangd（C/C++ 语言服务，原生支持 C++20 模块 import/module）=====
+  "clangd.path": "C:/Program Files/LLVM/bin/clangd.exe",
+  "clangd.arguments": [
+    "--compile-commands-dir=${workspaceFolder}/build/llvm",
+    "--background-index",
+    "--clang-tidy",
+    "--header-insertion=never",
+    "--all-scopes-completion",
+    "-j=4"
+  ],
+
+  // 文件类型：把 .cppm / .ixx 当作 C++ 处理（clangd 与 cpptools 都依赖此关联）
+  "files.associations": {
+    "*.cppm": "cpp",
+    "*.ixx": "cpp",
+    "*.hpp": "cpp",
+    "*.h": "c"
+  },
+
+  // 保存时自动格式化（clangd 内置 clang-format）
+  "editor.formatOnSave": true,
+  "[cpp]": { "editor.defaultFormatter": "llvm-vs-code.clangd" },
+  "[c]":   { "editor.defaultFormatter": "llvm-vs-code.clangd" },
+
+  // ===== CMake Tools（提供配置/构建，并把编译数据库喂给 clangd）=====
+  "cmake.configureOnOpen": true,
+  "cmake.generator": "Ninja Multi-Config",
+  "cmake.preferredGenerators": ["Ninja Multi-Config"],
+  "cmake.configurePresets": ["llvm"],
+  "cmake.buildPresets": ["llvm-debug"],
+  "cmake.cmakePath": "cmake",
+
+  // 关闭 MS C/C++ 扩展的 IntelliSense 冲突（若你未安装 cpptools 可忽略）
+  "C_Cpp.intelliSenseEngine": "disabled"
+}

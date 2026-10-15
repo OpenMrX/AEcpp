@@ -53,6 +53,13 @@ namespace AE::TUI
         /// 读取配置：环境变量 VXAE_ENDPOINT/VXAE_API_KEY/VXAE_MODEL/VXAE_AGENT_MODE
         /// > exe 同目录 demo_config.json（可选）> 内置占位默认。
         static auto loadConfig() -> BridgeConfig;
+        /// 把运行配置写回 exe 同目录 demo_config.json（模型配置页"保存并应用"时
+        /// 按需持久化）。尽力而为：写盘失败仅返回 false，不影响调用方热应用。
+        static auto saveConfig(const BridgeConfig &cfg) -> bool;
+        /// 是否已配置模型列表：环境变量 VXAE_MODEL 非空，或 exe 同目录
+        /// demo_config.json 含非空 modelList / model 字段。demo 启动时据此决定
+        /// 是否自动弹出模型配置页（无配置时引导用户先配模型，见 main.cpp）。
+        static auto hasConfiguredModelList() -> bool;
         /// 端点归一化：以 /v1 或 /v1/ 结尾时补全 /chat/completions（StreamingLLMClient
         /// 直接把 endpoint 当完整请求 URL 用）。
         static auto normalizeEndpoint(const std::string &endpoint) -> std::string;
@@ -86,6 +93,9 @@ namespace AE::TUI
         }
         /// 模型切换（ModelSwitch 事件）：更新配置 + setModelStatus 联动。
         auto switchModel(const std::string &model) -> void;
+        /// 热应用新配置（模型配置页保存后）：更新内部配置并联动模型列表/模型状态/
+        /// 连接灯/状态栏（模式与端点）。m_tui 为空时仅更新内部配置。
+        auto applyConfig(BridgeConfig cfg) -> void;
         /// 同步思考/意图开关状态（ToggleThinking/ToggleIntent 与启动恢复）。
         auto syncToggles(bool thinkingEnabled, bool intentEnabled) -> void;
 

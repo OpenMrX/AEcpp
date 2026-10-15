@@ -117,6 +117,53 @@ namespace
         }
     }
 
+    // 去首尾空白（配置页字段校验/入库前统一裁剪）。
+    auto trimCopy(const std::string &text) -> std::string
+    {
+        const auto first = text.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos)
+        {
+            return {};
+        }
+        const auto last = text.find_last_not_of(" \t\r\n");
+        return text.substr(first, last - first + 1);
+    }
+
+    // 逗号分隔字符串 → 去空白/去空项列表（模型配置页"模型列表"字段解析，兼容中文全角逗号）。
+    auto splitCsv(const std::string &text) -> std::vector<std::string>
+    {
+        // 中文全角逗号 U+FF0C（UTF-8: EF BC 8C）统一替换为英文逗号后再切分。
+        std::string normalized = text;
+        for (std::size_t i = normalized.find("\xEF\xBC\x8C"); i != std::string::npos;
+             i = normalized.find("\xEF\xBC\x8C", i))
+        {
+            normalized.replace(i, 3, ",");
+        }
+
+        std::vector<std::string> out;
+        std::string item;
+        auto flush = [&]
+        {
+            const std::string trimmed = trimCopy(item);
+            if (!trimmed.empty())
+            {
+                out.push_back(trimmed);
+            }
+            item.clear();
+        };
+        for (const char c : normalized)
+        {
+            if (c == ',')
+            {
+                flush();
+                continue;
+            }
+            item += c;
+        }
+        flush();
+        return out;
+    }
+
     // Windows 控制台 Ctrl 修饰键探测（同 InputBox 的 Shift 手法）：
     // Ctrl+H 字节 0x08 与 Backspace 相同，FTXUI 无法区分，需运行期查 GetAsyncKeyState。
     // 经 dllimport 的 LoadLibraryA/GetProcAddress 动态解析 user32，避免包含 Windows SDK 头文件。
@@ -210,6 +257,9 @@ namespace
                                                 postCustomEvent();
                                             }
                                         });
+
+            // 模型配置页组件树（-m/--model 或 Ctrl+G 打开；buildLayout 以 Modal 挂载）。
+            buildModelConfigPage();
 
             m_initialized.store(true);
             return Core::Result<void>::Ok();
@@ -388,13 +438,49 @@ namespace
             m_statusBar->getComponent(),
         });
 
+        // 模型配置页（-m/--model 或 Ctrl+G 打开）：以 Modal 覆盖层挂在主界面之上。
+        // visible 时 Modal 内部 Tab 容器把事件/焦点全量切到配置页——handleKeyEvent
+        // 开头分支只截断 Esc/Ctrl+S/Ctrl+Q，其余按键一律返回 false 下沉给配置页
+        // （文本编辑/字段导航/按钮），主界面（输入框/会话快捷键）不会被误触。
+        auto mainWithModal =
+            mainVertical | ftxui::Modal(m_modelConfigPage, &m_modelConfigVisible);
+
         // 顶层事件处理：键盘快捷键 + 鼠标下沉到当前会话 ChatPanel。
         // 关键：顶层 CatchEvent 是所有子组件的祖先，每个事件（含鼠标）必先经过此处，
         // 故滚轮滚动与思考块点击展开统一在此处理。若挂在各会话 ChatPanel 的
         // CatchEvent 上，因非焦点链祖先（焦点组件是输入框），鼠标事件永远到不了，
         // 会导致思考块点击无反应、滚轮也失效。
-        auto eventHandler = ftxui::CatchEvent(mainVertical, [this](ftxui::Event event)
+        auto eventHandler = ftxui::CatchEvent(mainWithModal, [this](ftxui::Event event)
                                               {
+            // 模型配置页（-m/--model / Ctrl+G 打开）事件优先级最高：
+            // 文本编辑/字段导航/按钮一律下沉给配置页（返回 false 经 Modal 分发），
+            // 仅 Esc 取消、Ctrl+S 保存、Ctrl+Q 退出由本层截断处理。
+            if (m_modelConfigVisible)
+            {
+                if (event == ftxui::Event::Escape)
+                {
+                    closeModelConfigPage();
+                    return true;
+                }
+                if (event == ftxui::Event::CtrlS)
+                {
+                    applyModelConfigPage();
+                    return true;
+                }
+                if (event == ftxui::Event::CtrlQ)
+                {
+                    // 与下方 Ctrl+Q 同口径：先 Exit 主循环再广播退出事件。
+                    stop();
+                    m_running.store(false);
+                    emitEvent(TUIEvent{
+                        .type = TUIEvent::Type::QuitRequested,
+                        .sessionId = m_currentSessionId,
+                    });
+                    return true;
+                }
+                return false; // 其余按键（含字符/方向/Tab）下沉 Modal 配置页
+            }
+
             // 鼠标事件下沉到当前会话的 ChatPanel：滚轮滚动 + 思考块点击展开（单条独立）。
             if (event.is_mouse())
             {
@@ -502,6 +588,8 @@ namespace
                         ftxui::separator(),
                         ftxui::text("Ctrl+H  显示/隐藏本帮助") | ftxui::color(tc.foreground),
                         ftxui::text("Ctrl+T  轮换主题样式") | ftxui::color(tc.foreground),
+                        ftxui::text("Ctrl+G  模型配置页（保存写入 demo_config.json）") |
+                            ftxui::color(tc.foreground),
                         ftxui::text("Ctrl+N  新建会话") | ftxui::color(tc.foreground),
                         ftxui::text("Ctrl+I  切换意图分析") | ftxui::color(tc.foreground),
                         ftxui::text("Ctrl+P  停止当前生成") | ftxui::color(tc.foreground),
@@ -719,6 +807,17 @@ namespace
             return true;
         }
 
+        // Ctrl+G：打开模型配置页（命令行 -m/--model 的运行时等价入口）。
+        // 字段预填由 main 响应 ModelConfigOpen 事件完成（注入当前生效配置）。
+        if (event == ftxui::Event::CtrlG)
+        {
+            emitEvent(TUIEvent{
+                .type = TUIEvent::Type::ModelConfigOpen,
+                .sessionId = m_currentSessionId,
+            });
+            return true;
+        }
+
         // Ctrl+T：轮换 TUI 主题样式并同步持久化。
         // （原版主题轮换在 Ctrl+D，MCP 开关占用 Ctrl+P；demo 移除 MCP 后，
         //   原 Ctrl+T 思考切换改由 Header 开关按钮承担，Ctrl+T 让位给主题轮换。）
@@ -871,6 +970,238 @@ namespace
     {
         m_config.defaultModel = std::move(modelName);
         persistTUIConfig();
+    }
+
+    // ─────────────────────────── 模型配置页 ───────────────────────────
+
+    auto TUI::buildModelConfigPage() -> ftxui::Component
+    {
+        auto mkInput = [](std::string *content, const char *placeholder, bool password)
+        {
+            ftxui::InputOption option;
+            option.content = content;
+            option.placeholder = placeholder;
+            option.password = password;
+            // 单行字段：Enter 不插换行（on_enter 置空操作；字段间导航走 Tab）。
+            option.multiline = false;
+            option.on_enter = [] {};
+            return ftxui::Input(option);
+        };
+        m_inputCfgModel = mkInput(&m_cfgModel, "gpt-4o-mini", false);
+        m_inputCfgEndpoint = mkInput(&m_cfgEndpoint, "https://api.openai.com/v1", false);
+        m_inputCfgApiKey = mkInput(&m_cfgApiKey, "sk-...", true);
+        m_inputCfgModelList = mkInput(&m_cfgModelListText, "逗号分隔：gpt-4o-mini, gpt-4o", false);
+
+        // 模式开关（手写两态 < chat > / < agent >，按键全控）：
+        // ←/→/h/l 直接切换，Enter/Space 反向切换；Tab/Shift+Tab 返回 false 放行给
+        // 外层 Vertical 容器做字段间导航（FTXUI Menu 系组件会自行吞掉 Tab 循环条目，
+        // 因此这里不用 ftxui::Toggle）。
+        auto modeRow = ftxui::Renderer([this]
+                                       {
+            const std::string text = (m_cfgModeIndex == 0) ? "< chat >" : "< agent >";
+            if (m_themeManager)
+            {
+                return ftxui::text(text) | ftxui::bold |
+                       ftxui::color(m_themeManager->colors().accent);
+            }
+            return ftxui::text(text) | ftxui::bold; });
+        m_toggleCfgMode = ftxui::CatchEvent(modeRow, [this](ftxui::Event event)
+                                            {
+            if (event == ftxui::Event::ArrowLeft || event == ftxui::Event::Character('h'))
+            {
+                m_cfgModeIndex = 0;
+                postCustomEvent();
+                return true;
+            }
+            if (event == ftxui::Event::ArrowRight || event == ftxui::Event::Character('l'))
+            {
+                m_cfgModeIndex = 1;
+                postCustomEvent();
+                return true;
+            }
+            if (event == ftxui::Event::Return || event == ftxui::Event::Character(' '))
+            {
+                m_cfgModeIndex = 1 - m_cfgModeIndex;
+                postCustomEvent();
+                return true;
+            }
+            return false; });
+
+        m_btnCfgSave = ftxui::Button("保存并应用", [this] { applyModelConfigPage(); });
+        m_btnCfgCancel = ftxui::Button("取消", [this] { closeModelConfigPage(); });
+
+        // 扁平 Vertical：输入框×4 + 模式开关 + 按钮行；非聚焦子项（无）不参与 Tab 环。
+        m_modelConfigContainer = ftxui::Container::Vertical({
+            m_inputCfgModel,
+            m_inputCfgEndpoint,
+            m_inputCfgApiKey,
+            m_inputCfgModelList,
+            m_toggleCfgMode,
+            ftxui::Container::Horizontal({m_btnCfgSave, m_btnCfgCancel}),
+        });
+        m_modelConfigPage = ftxui::Renderer(m_modelConfigContainer,
+                                            [this] { return renderModelConfigPage(); });
+        return m_modelConfigPage;
+    }
+
+    auto TUI::renderModelConfigPage() -> ftxui::Element
+    {
+        const auto &tc = m_themeManager->colors();
+
+        // 字段行：定宽标签 + 自适应输入框（输入框组件自行渲染，光标/聚焦态由 FTXUI 管理）。
+        auto label = [&tc](const std::string &text)
+        {
+            return ftxui::text(text) | ftxui::bold | ftxui::color(tc.accent) |
+                   ftxui::size(ftxui::WIDTH, ftxui::EQUAL, 10);
+        };
+        auto field = [](ftxui::Element element)
+        {
+            return element | ftxui::size(ftxui::WIDTH, ftxui::GREATER_THAN, 20) |
+                   ftxui::size(ftxui::WIDTH, ftxui::LESS_THAN, 44);
+        };
+
+        const ftxui::Element content = ftxui::vbox({
+            ftxui::hbox({label("模型"), field(m_inputCfgModel->Render())}),
+            ftxui::hbox({label("端点"), field(m_inputCfgEndpoint->Render())}),
+            ftxui::hbox({label("API Key"), field(m_inputCfgApiKey->Render())}),
+            ftxui::hbox({label("模型列表"), field(m_inputCfgModelList->Render())}),
+            ftxui::hbox({label("模式"), focusedCfgModeElement()}),
+            ftxui::separator(),
+            ftxui::hbox({m_btnCfgSave->Render(), ftxui::text("   "), m_btnCfgCancel->Render()}),
+            ftxui::separator(),
+            ftxui::text("Tab/Shift+Tab 切换字段 · ←/→ 切换模式 · Enter 激活按钮") |
+                ftxui::dim | ftxui::color(tc.muted),
+            ftxui::text("Ctrl+S 保存并应用 · Esc 取消（保存写入 exe 同目录 demo_config.json）") |
+                ftxui::dim | ftxui::color(tc.muted),
+        });
+
+        return ftxui::window(ftxui::text(" 模型配置 ") | ftxui::bold | ftxui::color(tc.accent),
+                             content) |
+               ftxui::bgcolor(tc.background) | ftxui::size(ftxui::WIDTH, ftxui::LESS_THAN, 72);
+    }
+
+    auto TUI::focusedCfgModeElement() -> ftxui::Element
+    {
+        // 模式行聚焦高亮：输入框/按钮的聚焦态由各自组件渲染，模式行为手写组件，
+        // 这里按 Focused() 链补一层 inverted，保证字段环游时有明确视觉焦点。
+        ftxui::Element element = m_toggleCfgMode ? m_toggleCfgMode->Render() : ftxui::text("");
+        if (m_toggleCfgMode && m_toggleCfgMode->Focused())
+        {
+            element = element | ftxui::inverted;
+        }
+        return element;
+    }
+
+    auto TUI::openModelConfigPage() -> void
+    {
+        if (m_modelConfigVisible)
+        {
+            return;
+        }
+        m_modelConfigVisible = true;
+        // 焦点进入"模型"输入框：TakeFocus 沿父链激活所在行；Modal 的 Tab 容器也会在
+        // 下一个事件/帧把选择切到配置页（OnEvent/OnRender 均会同步 selector_）。
+        if (m_inputCfgModel)
+        {
+            m_inputCfgModel->TakeFocus();
+        }
+        postCustomEvent();
+    }
+
+    auto TUI::closeModelConfigPage() -> void
+    {
+        if (!m_modelConfigVisible)
+        {
+            return;
+        }
+        m_modelConfigVisible = false;
+        postCustomEvent();
+        // 焦点还给聊天输入框（与 '/' / Esc 的聚焦口径一致）。
+        if (m_inputBox)
+        {
+            m_inputBox->takeFocus();
+        }
+    }
+
+    auto TUI::isModelConfigPageVisible() const -> bool
+    {
+        return m_modelConfigVisible;
+    }
+
+    auto TUI::setModelConfigDefaults(std::string endpoint, std::string apiKey,
+                                     std::string model, bool agentMode,
+                                     std::vector<std::string> modelList) -> void
+    {
+        m_cfgEndpoint = std::move(endpoint);
+        m_cfgApiKey = std::move(apiKey);
+        m_cfgModel = std::move(model);
+        m_cfgModeIndex = agentMode ? 1 : 0;
+        // 模型列表编辑态：逗号分隔；为空回退当前模型（保证列表至少一项）。
+        if (modelList.empty())
+        {
+            modelList.push_back(m_cfgModel);
+        }
+        std::string joined;
+        for (std::size_t i = 0; i < modelList.size(); ++i)
+        {
+            if (i != 0)
+            {
+                joined += ", ";
+            }
+            joined += modelList[i];
+        }
+        m_cfgModelListText = std::move(joined);
+        postCustomEvent();
+    }
+
+    auto TUI::applyModelConfigPage() -> void
+    {
+        const std::string model = trimCopy(m_cfgModel);
+        const std::string endpoint = trimCopy(m_cfgEndpoint);
+        if (model.empty() || endpoint.empty())
+        {
+            // 必填校验失败：保持页面打开，系统消息提示（不写盘、不应用）。
+            Message tip;
+            tip.id = makeMessageId();
+            tip.role = MessageRole::System;
+            tip.status = MessageStatus::Completed;
+            tip.content = model.empty() ? "⚠ 模型名不能为空，已取消保存（配置页保持打开）。"
+                                        : "⚠ 端点不能为空，已取消保存（配置页保持打开）。";
+            addMessage(m_currentSessionId, tip);
+            return;
+        }
+
+        // 模型列表：逗号分隔解析（兼容中文逗号）；为空回退为 [当前模型]。
+        std::vector<std::string> modelList = splitCsv(m_cfgModelListText);
+        if (modelList.empty())
+        {
+            modelList.push_back(model);
+        }
+        // 去重（保留首次出现顺序）：多模型统一入 demo_config.json，面板列表不出现重复项。
+        std::vector<std::string> deduped;
+        for (const auto &entry : modelList)
+        {
+            if (std::find(deduped.begin(), deduped.end(), entry) == deduped.end())
+            {
+                deduped.push_back(entry);
+            }
+        }
+        modelList = std::move(deduped);
+
+        nlohmann::json data;
+        data["endpoint"] = endpoint;
+        data["apiKey"] = trimCopy(m_cfgApiKey);
+        data["model"] = model;
+        data["agentMode"] = (m_cfgModeIndex == 1);
+        data["modelList"] = modelList;
+
+        closeModelConfigPage();
+        // 完整配置经事件回传 main：按需落盘 demo_config.json + 热应用桥接层。
+        emitEvent(TUIEvent{
+            .type = TUIEvent::Type::ModelConfigApply,
+            .sessionId = m_currentSessionId,
+            .data = std::move(data),
+        });
     }
 
     auto TUI::addMessage(const std::string &sessionId, const Message &message) -> void

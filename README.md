@@ -29,7 +29,7 @@
 | 遥测 | `AETelemetry.hpp` | 语义事件 + 可插拔 `IAEEventSink`，trace id 标准库随机 hex |
 | 上下文/计量 | `TokenCounter.hpp` | token 近似计数、上下文窗口探测 |
 | 录制回放 | `AERecordReplay.hpp` | HAR 式 Record/Replay 注入 |
-| 自带基座 | `include/Core/` | `Result`（`std::expected`）、`Error`、`Logger`（`std::print` 原生）、`SecureString`、`SseParser`、`HttpCurl` |
+| 自带基座 | `src/Core/` | `Result`（`std::expected`）、`Error`、`Logger`（`std::print` 原生）、`SecureString`、`SseParser`、`HttpCurl` |
 
 ## 依赖与致谢
 
@@ -109,19 +109,26 @@ preset 已开启 `CMAKE_EXPORT_COMPILE_COMMANDS`，编译数据库落在 `build/
 }
 ```
 
+该文件也可由模型配置页（`-m`/`--model` 或运行时 `Ctrl+G` 的"保存并应用"）自动生成/更新。
+
 3. 内置默认（endpoint `https://api.openai.com/v1`、model `gpt-4o-mini`、无 key —— 连接灯红色并提示）。
 
 ### 运行
 
 ```bash
-build/llvm/Debug/vxae_demo        # Linux/macOS
-build\llvm\Debug\vxae_demo.exe    # Windows
+build/llvm/Debug/vxae_demo                 # Linux/macOS
+build\llvm\Debug\vxae_demo.exe             # Windows
+build\llvm\Debug\vxae_demo.exe -m          # 启动即进入模型配置页
+build\llvm\Debug\vxae_demo.exe -m gpt-4o   # 以 gpt-4o 预填"模型"字段
+build\llvm\Debug\vxae_demo.exe --help      # 查看全部命令行选项
 ```
 
 - **chat 模式（默认）**：单轮流式对话（`StreamingLLMClient`），SSE 增量/思考块/真实 token 统计；
 - **agent 模式**：`AgentEngine` 完整循环，多轮工具调用（内置演示工具 `current_time`），工具消息可折叠回填；
-- 快捷键：`Shift+Enter` 发送、`Enter` 换行、`Ctrl+P` 停止当前请求、`Ctrl+H` 帮助、`Ctrl+T` 主题轮换、`Ctrl+Q` 退出；
-- 主题/模型选择持久化在 exe 同目录 `demo_settings.json`。
+- **模型配置页**：未配置任何模型列表时启动**自动弹出**（引导先配模型；已配置则直接进聊天）；也可用启动参数 `-m`/`--model` 或运行时 `Ctrl+G` 打开。编辑模型/端点/API Key/模式/模型列表，"保存并应用"按需写入 exe 同目录 `demo_config.json` 并立即生效（写盘失败时仅本会话生效并给出提示）；
+- **多模型**：配置页"模型列表"字段逗号分隔（如 `gpt-4o-mini, gpt-4o, qwen-plus`），统一持久化到 `demo_config.json` 的 `modelList`；底部状态栏点击模型名（`Model: xxx`）展开面板列表，`↑/↓` 选择、`Enter` 切换，当前模型以 ✓ 高亮，切换后同步状态栏、默认模型与后续请求；
+- 快捷键：`Shift+Enter` 发送、`Enter` 换行、`Ctrl+P` 停止当前请求、`Ctrl+G` 模型配置页、`Ctrl+H` 帮助、`Ctrl+T` 主题轮换、`Ctrl+Q` 退出；
+- 主题/模型选择持久化在 exe 同目录 `demo_settings.json`；模型配置页保存的是 `demo_config.json`（环境变量优先级仍高于它）。
 
 ## 在你的工程中使用
 
@@ -137,7 +144,7 @@ target_compile_features(your_target PRIVATE cxx_std_26)
 #include "AE/AEConfig.hpp"           // JSON 配置
 ```
 
-要点：C++26 必需（clang-cl 映射 `-std:c++latest`）；include 根为 `include/`、`include/AE/`、`vendor/`；`UUID_SYSTEM_GENERATOR`/`Ole32` 等历史包袱已不存在。
+要点：C++26 必需（clang-cl 映射 `-std:c++latest`）；include 根为 `src/`、`src/AE/`、`src/vendor/`；`UUID_SYSTEM_GENERATOR`/`Ole32` 等历史包袱已不存在。
 
 ## 许可
 

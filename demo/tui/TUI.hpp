@@ -94,6 +94,15 @@ namespace AE::TUI
                                 bool &intent) -> void override;
         auto setDefaultModel(std::string modelName) -> void override;
 
+        // ── 模型配置页（vxae_demo -m/--model 或运行时 Ctrl+G 打开）──
+        // 保存后不直接落盘：emit ModelConfigApply 把完整配置交给 main
+        // （AETUIBridge::saveConfig 写 demo_config.json + applyConfig 热应用）。
+        auto openModelConfigPage() -> void override;
+        auto setModelConfigDefaults(std::string endpoint, std::string apiKey,
+                                    std::string model, bool agentMode,
+                                    std::vector<std::string> modelList) -> void override;
+        auto isModelConfigPageVisible() const -> bool override;
+
     private:
         auto buildLayout() -> ftxui::Component;
         auto handleKeyEvent(const ftxui::Event &event) -> bool;
@@ -111,6 +120,16 @@ namespace AE::TUI
         auto openModelList() -> void;
         // Ctrl+T：主题样式轮换 + 同步持久化（demo_settings.json）。
         auto cycleTheme() -> void;
+        // 构建模型配置页组件树（输入框/模式开关/按钮；仅事件路由，渲染见 renderModelConfigPage）。
+        auto buildModelConfigPage() -> ftxui::Component;
+        // 模型配置页整帧渲染（窗口 + 字段行，经 ftxui::Modal 覆盖在主界面上）。
+        auto renderModelConfigPage() -> ftxui::Element;
+        // 模式行元素（含聚焦高亮；输入框/按钮的聚焦态由各自组件渲染）。
+        auto focusedCfgModeElement() -> ftxui::Element;
+        // "保存并应用"：字段校验（模型名/端点非空）→ 关闭页面 → emit ModelConfigApply。
+        auto applyModelConfigPage() -> void;
+        // 取消/保存后关闭页面，焦点还给输入框。
+        auto closeModelConfigPage() -> void;
         // 从 demo_settings.json 恢复上次保存的主题（默认 Dark，供 initialize 早期应用）。
         auto loadPersistedTheme() -> ThemeVariant;
         // 纯内存会话：启动时无会话则创建一个默认会话。
@@ -149,6 +168,23 @@ namespace AE::TUI
         std::string m_currentModel;
 
         TUIConfig m_config;
+        // ── 模型配置页状态（-m/--model 或 Ctrl+G 打开）──
+        // 编辑态字段缓冲区 + 组件树；保存经 ModelConfigApply 事件回传 main 落盘。
+        bool m_modelConfigVisible{false};
+        std::string m_cfgModel;
+        std::string m_cfgEndpoint;
+        std::string m_cfgApiKey;
+        std::string m_cfgModelListText; // 逗号分隔的模型列表编辑态
+        int m_cfgModeIndex{0};          // 模式开关：0=chat，1=agent
+        ftxui::Component m_inputCfgModel;
+        ftxui::Component m_inputCfgEndpoint;
+        ftxui::Component m_inputCfgApiKey;
+        ftxui::Component m_inputCfgModelList;
+        ftxui::Component m_toggleCfgMode;
+        ftxui::Component m_btnCfgSave;
+        ftxui::Component m_btnCfgCancel;
+        ftxui::Component m_modelConfigContainer; // 字段容器（Tab 导航/焦点管理）
+        ftxui::Component m_modelConfigPage;      // 带窗口装饰的整页（挂 ftxui::Modal）
         std::atomic<bool> m_initialized{false};
         std::atomic<bool> m_running{false};
         // 思考模式开关的当前 UI 状态（由 setModelStatus 同步，供开关按钮初始化）。

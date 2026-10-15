@@ -191,6 +191,13 @@ namespace AE::TUI
             ToggleIntent,
             ToggleMcp,
             ModelSwitch,
+            // 请求打开模型配置页（Ctrl+G / 启动参数 -m/--model）：main 用当前生效
+            // 配置预填字段后打开覆盖页。
+            ModelConfigOpen,
+            // 模型配置页"保存并应用"：data 携带完整配置 JSON
+            // （endpoint/apiKey/model/agentMode/modelList），由 main 按需落盘
+            // demo_config.json 并热应用到桥接层。
+            ModelConfigApply,
             RestartRequested,
             StopRequested, // Ctrl+P：请求停止当前生成（桥接层消费）
             // 占位：帮助信息事件（当前未绑定按键，保留供后续实现）。

@@ -17,6 +17,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <print>
 #include <random>
 #include <sstream>
 #include <string_view>
@@ -156,6 +157,88 @@ namespace
         if (cfg.modelList.empty())
             cfg.modelList.push_back(cfg.model);
         return cfg;
+    }
+
+    auto AETUIBridge::saveConfig(const BridgeConfig &cfg) -> bool
+    {
+        // demo_config.json 与 loadConfig 同路径（exe 同目录）、同字段口径：
+        // 模型配置页"保存并应用"时按需持久化，重启后经 loadConfig 恢复。
+        try
+        {
+            nlohmann::json j;
+            j["endpoint"] = cfg.endpoint;
+            j["apiKey"] = cfg.apiKey;
+            j["model"] = cfg.model;
+            j["agentMode"] = cfg.agentMode;
+            j["modelList"] = cfg.modelList;
+
+            const auto path = exeDir() / "demo_config.json";
+            std::ofstream out(path, std::ios::binary | std::ios::trunc);
+            if (!out.is_open())
+            {
+                std::println(stderr, "[Bridge] persist config failed: cannot open {}",
+                             path.string());
+                return false;
+            }
+            out << j.dump(2) << '\n';
+            return true;
+        }
+        catch (const std::exception &e)
+        {
+            std::println(stderr, "[Bridge] persist config failed: {}", e.what());
+            return false;
+        }
+        catch (...)
+        {
+            std::println(stderr, "[Bridge] persist config failed: unknown exception");
+            return false;
+        }
+    }
+
+    auto AETUIBridge::hasConfiguredModelList() -> bool
+    {
+        // 1) 环境变量显式指定模型即视为已配置（优先级最高，启动不再弹配置页）。
+        if (auto v = envOrEmpty("VXAE_MODEL"); !v.empty())
+        {
+            return true;
+        }
+        // 2) exe 同目录 demo_config.json：非空 modelList（模型配置页保存的多模型
+        //    列表），或旧格式仅有的非空 model 字段。
+        try
+        {
+            const auto path = exeDir() / "demo_config.json";
+            if (!std::filesystem::exists(path))
+            {
+                return false;
+            }
+            std::ifstream in(path);
+            const auto j = nlohmann::json::parse(in, nullptr, false);
+            if (j.is_discarded() || !j.is_object())
+            {
+                return false;
+            }
+            if (j.contains("modelList") && j["modelList"].is_array())
+            {
+                for (const auto &entry : j["modelList"])
+                {
+                    if (entry.is_string() && !entry.get<std::string>().empty())
+                    {
+                        return true;
+                    }
+                }
+            }
+            if (j.contains("model") && j["model"].is_string() &&
+                !j["model"].get<std::string>().empty())
+            {
+                return true;
+            }
+            return false;
+        }
+        catch (...)
+        {
+            // 配置损坏/不可读：按"未配置"处理，引导用户进配置页重建。
+            return false;
+        }
     }
 
     // ─────────────────────────────── 生命周期 ───────────────────────────────
@@ -303,6 +386,48 @@ namespace
                             {
             std::scoped_lock lock(m_cfgMutex);
             return m_config.modelList; }());
+    }
+
+    auto AETUIBridge::applyConfig(BridgeConfig cfg) -> void
+    {
+        if (cfg.modelList.empty())
+        {
+            cfg.modelList.push_back(cfg.model);
+        }
+        // 当前模型必须出现在可选列表里（与 switchModel 同口径），否则底部列表
+        // 选不中刚保存的模型。
+        if (std::find(cfg.modelList.begin(), cfg.modelList.end(), cfg.model) ==
+            cfg.modelList.end())
+        {
+            cfg.modelList.push_back(cfg.model);
+        }
+        {
+            std::scoped_lock lock(m_cfgMutex);
+            m_config = std::move(cfg);
+        }
+
+        if (!m_tui)
+        {
+            return;
+        }
+
+        // 与 initialize() 同口径联动 TUI：模型列表/模型状态/连接灯/状态栏（模式/端点）。
+        const BridgeConfig snapshot = config();
+        m_tui->setModelList(snapshot.modelList);
+        m_tui->setModelStatus(snapshot.model, m_thinkingEnabled.load(), m_intentEnabled.load());
+        m_tui->setConnected(!snapshot.apiKey.empty());
+
+        std::vector<StatusItem> items;
+        items.push_back(StatusItem{.label = "模式", .value = snapshot.agentMode ? "agent" : "chat", .color = "cyan"});
+        items.push_back(StatusItem{.label = "端点", .value = snapshot.endpoint, .color = "gray"});
+        m_tui->setStatusItems(items);
+
+        if (snapshot.apiKey.empty())
+        {
+            postSystemMessage(m_tui->getCurrentSessionId(),
+                              "⚠ 未配置 API Key（VXAE_API_KEY / demo_config.json.apiKey），"
+                              "连接指示灯为断开状态；本地端点可忽略此提示。");
+        }
     }
 
     auto AETUIBridge::syncToggles(bool thinkingEnabled, bool intentEnabled) -> void

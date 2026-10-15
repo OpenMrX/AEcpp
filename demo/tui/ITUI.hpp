@@ -89,6 +89,16 @@ namespace AE::TUI
                                         bool &intent) -> void = 0;
         // 更新 TUI 侧默认模型名（模型切换时调用，并同步持久化）。
         virtual auto setDefaultModel(std::string modelName) -> void = 0;
+
+        // ── 模型配置页（vxae_demo -m/--model 或运行时 Ctrl+G 打开）──
+        // 打开模型配置覆盖页；字段值由 setModelConfigDefaults 预填（未预填时为空）。
+        virtual auto openModelConfigPage() -> void {}
+        // 预填配置页字段（main 在打开页面前注入当前生效的桥接层配置）。
+        virtual auto setModelConfigDefaults(std::string endpoint, std::string apiKey,
+                                            std::string model, bool agentMode,
+                                            std::vector<std::string> modelList) -> void {}
+        // 模型配置页当前是否处于打开状态。
+        virtual auto isModelConfigPageVisible() const -> bool { return false; }
     };
 
 } // namespace AE::TUI
