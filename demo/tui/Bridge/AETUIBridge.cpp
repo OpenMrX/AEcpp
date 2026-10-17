@@ -5,9 +5,11 @@
 
 #include "AE.hpp"
 #include "AEType.hpp"
-#include "IAE.hpp"
+#include "AESimple.hpp"
 #include "LLMAdapter.hpp"
 #include "StreamingLLMClient.hpp"
+#include "Mode/PlanExecuteMode.hpp"
+#include "Mode/ReflectionMode.hpp"
 #include "Core/Security/SecureString.hpp"
 
 #include <algorithm>
@@ -64,6 +66,34 @@ namespace
     auto truthy(std::string_view s) -> bool
     {
         return s == "1" || s == "true" || s == "TRUE" || s == "on" || s == "yes";
+    }
+
+    // 环形遍历：返回 modes 中 cur 的下一项；cur 不在表内则取首项。
+    template <std::size_t N>
+    auto nextInCycle(const std::string &cur, const std::string (&modes)[N]) -> std::string
+    {
+        for (std::size_t i = 0; i < N; ++i)
+            if (cur == modes[i])
+                return modes[(i + 1) % N];
+        return modes[0];
+    }
+
+    // 协作拓扑单行文字描述（P8「协作拓扑展示」）。
+    auto topologyDetail(std::string_view mode) -> std::string
+    {
+        if (mode == "orchestrator")
+            return "orchestrator ─┬─▶ worker*（中心扇出 + 逐步聚合）";
+        if (mode == "supervisor")
+            return "worker ─▶ supervisor（质量闸门，未达标条件回连）";
+        if (mode == "group_chat")
+            return "participants ⇄ 共享会话（轮询发言 + 可选 Concluder）";
+        if (mode == "debate")
+            return "debaters ∥ 论证 ─▶ 收敛判定 ─▶ moderator 裁决";
+        if (mode == "peer_to_peer")
+            return "node ⇄ node（消息 id 去重 + 跳数上限）";
+        if (mode == "sequential")
+            return "stage1 ─▶ stage2 ─▶ … ─▶ stageN（顺序流水线）";
+        return "off（单 Agent 直跑，无协作拓扑）";
     }
 
     // Agent 模式 demo 工具：返回当前时间。让工具循环链路真实可跑通
@@ -136,6 +166,10 @@ namespace
                         cfg.agentMode = j["agentMode"].get<bool>();
                     if (j.contains("modelList") && j["modelList"].is_array())
                         cfg.modelList = j["modelList"].get<std::vector<std::string>>();
+                    if (j.contains("reasoningMode") && j["reasoningMode"].is_string())
+                        cfg.reasoningMode = j["reasoningMode"].get<std::string>();
+                    if (j.contains("collabMode") && j["collabMode"].is_string())
+                        cfg.collabMode = j["collabMode"].get<std::string>();
                 }
             }
         }
@@ -153,6 +187,10 @@ namespace
             cfg.model = v;
         if (auto v = envOrEmpty("VXAE_AGENT_MODE"); !v.empty())
             cfg.agentMode = truthy(v);
+        if (auto v = envOrEmpty("VXAE_REASONING_MODE"); !v.empty())
+            cfg.reasoningMode = v;
+        if (auto v = envOrEmpty("VXAE_COLLAB_MODE"); !v.empty())
+            cfg.collabMode = v;
 
         if (cfg.modelList.empty())
             cfg.modelList.push_back(cfg.model);
@@ -171,6 +209,8 @@ namespace
             j["model"] = cfg.model;
             j["agentMode"] = cfg.agentMode;
             j["modelList"] = cfg.modelList;
+            j["reasoningMode"] = cfg.reasoningMode;
+            j["collabMode"] = cfg.collabMode;
 
             const auto path = exeDir() / "demo_config.json";
             std::ofstream out(path, std::ios::binary | std::ios::trunc);
@@ -272,10 +312,7 @@ namespace
         m_tui->setModelStatus(cfg.model, m_thinkingEnabled.load(), m_intentEnabled.load());
         m_tui->setConnected(connected);
 
-        std::vector<StatusItem> items;
-        items.push_back(StatusItem{.label = "模式", .value = cfg.agentMode ? "agent" : "chat", .color = "cyan"});
-        items.push_back(StatusItem{.label = "端点", .value = cfg.endpoint, .color = "gray"});
-        m_tui->setStatusItems(items);
+        m_tui->setStatusItems(buildStatusItems(cfg));
 
         if (!connected)
             postSystemMessage(m_tui->getCurrentSessionId(),
@@ -417,10 +454,7 @@ namespace
         m_tui->setModelStatus(snapshot.model, m_thinkingEnabled.load(), m_intentEnabled.load());
         m_tui->setConnected(!snapshot.apiKey.empty());
 
-        std::vector<StatusItem> items;
-        items.push_back(StatusItem{.label = "模式", .value = snapshot.agentMode ? "agent" : "chat", .color = "cyan"});
-        items.push_back(StatusItem{.label = "端点", .value = snapshot.endpoint, .color = "gray"});
-        m_tui->setStatusItems(items);
+        m_tui->setStatusItems(buildStatusItems(snapshot));
 
         if (snapshot.apiKey.empty())
         {
@@ -436,6 +470,90 @@ namespace
         m_intentEnabled.store(intentEnabled);
         std::scoped_lock lock(m_cfgMutex);
         m_tui->setModelStatus(m_config.model, thinkingEnabled, intentEnabled);
+    }
+
+    // ─────────────────────────────── P8 集成：模式 / 拓扑 ───────────────────────────────
+
+    auto AETUIBridge::buildStatusItems(const BridgeConfig &cfg) -> std::vector<StatusItem>
+    {
+        std::vector<StatusItem> items;
+        items.push_back(StatusItem{.label = "模式", .value = cfg.agentMode ? "agent" : "chat", .color = "cyan"});
+        if (cfg.agentMode)
+            items.push_back(StatusItem{.label = "推理",
+                                       .value = cfg.reasoningMode.empty() ? std::string{"react"} : cfg.reasoningMode,
+                                       .color = "green"});
+        items.push_back(StatusItem{.label = "协作",
+                                   .value = cfg.collabMode.empty() ? std::string{"off"} : cfg.collabMode,
+                                   .color = "magenta"});
+        items.push_back(StatusItem{.label = "端点", .value = cfg.endpoint, .color = "gray"});
+        return items;
+    }
+
+    auto AETUIBridge::describeTopology(const BridgeConfig &cfg) -> OrchestrationInfo
+    {
+        OrchestrationInfo oi;
+        oi.visible = true;
+        const std::string rm = cfg.reasoningMode.empty() ? std::string{"react"} : cfg.reasoningMode;
+        const std::string cm = cfg.collabMode.empty() ? std::string{"off"} : cfg.collabMode;
+        oi.intent = "推理:" + rm;
+        oi.route = (cm == "off") ? rm : cm;
+        oi.steps.push_back(OrchestrationStep{.phase = "reason",
+                                             .summary = "单 Agent 推理模式 = " + rm,
+                                             .detail = {}});
+        oi.steps.push_back(OrchestrationStep{.phase = "collab",
+                                             .summary = "协作模式 = " + cm,
+                                             .detail = topologyDetail(cm)});
+        oi.stepTotal = static_cast<int>(oi.steps.size());
+        oi.stepIndex = oi.stepTotal;
+        return oi;
+    }
+
+    auto AETUIBridge::publishOrchestration(const BridgeConfig &cfg, const std::string &sessionId,
+                                           const std::string &messageId, std::string_view failure) -> void
+    {
+        if (!m_tui || sessionId.empty() || messageId.empty())
+            return;
+        OrchestrationInfo oi = describeTopology(cfg);
+        if (!failure.empty())
+        {
+            oi.steps.push_back(OrchestrationStep{.phase = "fail",
+                                                 .summary = "失败降级：" + std::string{failure},
+                                                 .detail = {}});
+            oi.stepTotal = static_cast<int>(oi.steps.size());
+            oi.stepIndex = oi.stepTotal;
+        }
+        m_tui->setOrchestrationInfo(sessionId, messageId, std::move(oi));
+    }
+
+    auto AETUIBridge::cycleReasoningMode() -> std::string
+    {
+        static const std::string kModes[] = {"react", "plan", "reflection"};
+        std::string next;
+        {
+            std::scoped_lock lock(m_cfgMutex);
+            next = nextInCycle(m_config.reasoningMode, kModes);
+            m_config.reasoningMode = next;
+        }
+        m_tui->setStatusItems(buildStatusItems(config()));
+        postSystemMessage(m_tui->getCurrentSessionId(),
+                          "推理模式 → " + next + "（下一次 Agent 请求生效；Ctrl+R 切换）");
+        return next;
+    }
+
+    auto AETUIBridge::cycleCollabMode() -> std::string
+    {
+        static const std::string kModes[] = {"off", "orchestrator", "supervisor",
+                                             "group_chat", "debate", "peer_to_peer", "sequential"};
+        std::string next;
+        {
+            std::scoped_lock lock(m_cfgMutex);
+            next = nextInCycle(m_config.collabMode, kModes);
+            m_config.collabMode = next;
+        }
+        m_tui->setStatusItems(buildStatusItems(config()));
+        postSystemMessage(m_tui->getCurrentSessionId(),
+                          "协作模式 → " + next + "\n" + topologyDetail(next) + "\n（Ctrl+B 切换）");
+        return next;
     }
 
     // ─────────────────────────────── worker 主体 ───────────────────────────────
@@ -568,6 +686,15 @@ namespace
         AE::Engine::SimpleContextSource ctx;
         AE::Engine::AgentEngine engine(tools, ctx, adapter);
 
+        // P8 集成：按配置选择单 Agent 推理模式（下次请求即时生效）。
+        const std::string rm = cfg.reasoningMode.empty() ? std::string{"react"} : cfg.reasoningMode;
+        AE::Engine::LlmReflector reflector(cfg.model);
+        if (rm == "plan")
+            engine.emplace_mode<AE::Engine::PlanExecuteMode>();
+        else if (rm == "reflection")
+            engine.emplace_mode<AE::Engine::ReflectionMode<AE::Engine::ReactMode>>(
+                AE::Engine::ReactMode{}, reflector);
+
         nlohmann::json body;
         body["model"] = cfg.model;
         body["messages"] = history;
@@ -681,6 +808,9 @@ namespace
         m_tui->setMessageTokens(sessionId, assistantId, 0, 0, 0,
                                 static_cast<int32_t>(tokensTotal));
         mirrorFinishAssistant(sessionId, assistantId, 0, 0, 0, static_cast<int32_t>(tokensTotal));
+
+        // P8：回填编排信息块（推理模式 + 协作拓扑；失败时附降级说明）。
+        publishOrchestration(cfg, sessionId, assistantId, failed ? errorMsg : std::string_view{});
 
         if (failed)
         {

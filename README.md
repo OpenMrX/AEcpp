@@ -18,12 +18,17 @@
 
 | 模块 | 头/源文件 | 说明 |
 |---|---|---|
-| Agent 主循环 | `AE.hpp`（`AgentEngine`） | 多轮工具调用、迭代上限、优雅停止（stop token）、hooks |
+| Agent 主循环 | `AgentEngine.hpp`（薄壳）/ `Mode/ReactMode.hpp` / `AE.hpp`（聚合伞头） | 多轮工具调用、迭代上限、优雅停止（stop token）、hooks；主循环在 ReAct 模式内 |
+| 推理模式 | `Mode/`（`ModeContext.hpp` / `IReasoningMode.hpp` / `ReactMode.hpp` / `Plan*.hpp` / `IReflector.hpp` / `ReflectionMode.hpp`） | `ReasoningMode` 编译期契约 + `ModeContext`；ReAct / Plan-and-Execute（`IPlanner`+`IStepExecutor`+`IAggregator`）/ Reflection（零开销装饰器 + 无效循环熔断） |
+| 多 Agent 协作 | `Collab/`（`AgentRuntime.hpp` / `AgentRegistry.hpp` / `MessageBus.hpp` / `CollaborationEvent.hpp` / `TaskAssigner.hpp` / `Critic.hpp` / `CollabSelector.hpp`） | 6 协作模式（Orchestrator-Worker / Supervisor / GroupChat / Debate / Peer-to-Peer / Sequential Workflow）+ 独立 `CollaborationEvent` IR + 能力分配/策略选择 |
+| 框架→模式映射 | `Mapping/`（`Primitives/Graph.hpp` / `RoleTask.hpp` / `Conversation.hpp` / `Flow.hpp` / `Router.hpp` / `VisualSpec.hpp` / `PatternBuilder.hpp`） | 可组合原语（图/角色/对话/数据流/Handoff）+ `Patterns` 6 模式构建器 + `VisualSpec` 可序列化拓扑（低代码接入） |
+| 外部扩展 Ports | `Ports/`（`ToolPort.hpp` / `McpTransport.hpp` / `McpHttpClient.hpp` / `MemoryPort.hpp` / `ExecutorPort.hpp` / `HumanPort.hpp` / `ModelPort.hpp`） | 纯接口 + 默认实现；MCP JSON-RPC over HTTP 参考实现 |
+| 外部实现参考 | `Ports/`（`InMemoryStore.hpp` / `ProcessExecutor.hpp` / `ScriptedHumanGate.hpp`） | P7 参考实现：KV/TTL/打分召回记忆后端（+长期/共享/工作三层适配）、`LocalProcessExecutor`+`AllowListSandbox`、`ScriptedHumanGate` 决策队列 |
 | 流式客户端 | `StreamingLLMClient.hpp` | libcurl SSE、重试/退避、`LlmDelta` IR（Text/Thinking/Usage/Error） |
-| 后端适配 | `LLMAdapter.hpp` | OpenAI 兼容 / vLLM / Ollama 统一 IR，上层无感知 |
+| 后端适配 | `LLMAdapter.hpp` / `AEManager.hpp` | OpenAI 兼容 / vLLM / Ollama 统一 IR，上层无感知；`AEManager` 为 AE 工厂/管理器 |
 | 配置层 | `AEConfig.hpp` | JSON 配置（nlohmann），密钥经 `SecureString` |
 | 会话存储 | `AESessionStore.*` | `IStateStore` 实现，落盘/恢复对话状态 |
-| 工具面 | `IAE.hpp` / `AEBuiltinTools.*` / `NullToolProvider.hpp` / `SimpleToolProvider` | `IToolProvider` 抽象 + 内建工具 |
+| 工具面 | `AEType.hpp` / `AESimple.hpp` / `AEBuiltinTools.*` / `NullToolProvider.hpp` | `IToolProvider` 抽象 + `SimpleToolProvider` + 内建工具 |
 | 安全 | `AESecurity.hpp`、`AESecurityGuard.*`、`AESanitize.hpp` | SSRF/出站防护、路径校验、Shell 注入防护、提示注入净化 |
 | 策略 | `AEToolPolicy.*` | 工具执行权限门控（`IPermissionGate`） |
 | 遥测 | `AETelemetry.hpp` | 语义事件 + 可插拔 `IAEEventSink`，trace id 标准库随机 hex |
@@ -125,9 +130,10 @@ build\llvm\Debug\vxae_demo.exe --help      # 查看全部命令行选项
 
 - **chat 模式（默认）**：单轮流式对话（`StreamingLLMClient`），SSE 增量/思考块/真实 token 统计；
 - **agent 模式**：`AgentEngine` 完整循环，多轮工具调用（内置演示工具 `current_time`），工具消息可折叠回填；
+- **推理 / 协作模式（P8）**：agent 模式下 `Ctrl+R` 循环单 Agent 推理模式（`react`→`plan`→`reflection`）、`Ctrl+B` 循环多 Agent 协作模式（`off`→`orchestrator`→`supervisor`→`group_chat`→`debate`→`peer_to_peer`→`sequential`）；助手消息内回填编排信息块（推理模式 + 协作拓扑 + 失败降级说明），失败路径可见；也可用环境变量 `VXAE_REASONING_MODE`/`VXAE_COLLAB_MODE` 或 `demo_config.json` 预设；
 - **模型配置页**：未配置任何模型列表时启动**自动弹出**（引导先配模型；已配置则直接进聊天）；也可用启动参数 `-m`/`--model` 或运行时 `Ctrl+G` 打开。编辑模型/端点/API Key/模式/模型列表，"保存并应用"按需写入 exe 同目录 `demo_config.json` 并立即生效（写盘失败时仅本会话生效并给出提示）；
 - **多模型**：配置页"模型列表"字段逗号分隔（如 `gpt-4o-mini, gpt-4o, qwen-plus`），统一持久化到 `demo_config.json` 的 `modelList`；底部状态栏点击模型名（`Model: xxx`）展开面板列表，`↑/↓` 选择、`Enter` 切换，当前模型以 ✓ 高亮，切换后同步状态栏、默认模型与后续请求；
-- 快捷键：`Shift+Enter` 发送、`Enter` 换行、`Ctrl+P` 停止当前请求、`Ctrl+G` 模型配置页、`Ctrl+H` 帮助、`Ctrl+T` 主题轮换、`Ctrl+Q` 退出；
+- 快捷键：`Shift+Enter` 发送、`Enter` 换行、`Ctrl+P` 停止当前请求、`Ctrl+R` 循环推理模式、`Ctrl+B` 循环协作模式、`Ctrl+G` 模型配置页、`Ctrl+H` 帮助、`Ctrl+T` 主题轮换、`Ctrl+Q` 退出；
 - 主题/模型选择持久化在 exe 同目录 `demo_settings.json`；模型配置页保存的是 `demo_config.json`（环境变量优先级仍高于它）。
 
 ## 在你的工程中使用

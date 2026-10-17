@@ -39,6 +39,9 @@ namespace AE::TUI
         std::string model;                     ///< 当前模型名
         bool agentMode = false;                ///< true=Agent 循环，false=单轮 Chat
         std::vector<std::string> modelList;    ///< TUI 底部可选模型列表
+        // ── P8 集成：单 Agent 推理模式 + 多 Agent 协作模式（Docs/01 §8.1 P8）──
+        std::string reasoningMode = "react";   ///< react | plan | reflection（Agent 模式下的推理模式）
+        std::string collabMode = "off";        ///< off | orchestrator | supervisor | group_chat | debate | peer_to_peer | sequential
     };
 
     class AETUIBridge final
@@ -99,7 +102,23 @@ namespace AE::TUI
         /// 同步思考/意图开关状态（ToggleThinking/ToggleIntent 与启动恢复）。
         auto syncToggles(bool thinkingEnabled, bool intentEnabled) -> void;
 
+        // ── P8 集成：模式切换 / 拓扑展示（Ctrl+R / Ctrl+B）──
+        /// 循环切换单 Agent 推理模式（react→plan→reflection→react）；联动状态栏，
+        /// 返回切换后的模式名。
+        auto cycleReasoningMode() -> std::string;
+        /// 循环切换多 Agent 协作模式（off→…→sequential→off）；联动状态栏，
+        /// 返回切换后的模式名。
+        auto cycleCollabMode() -> std::string;
+
     private:
+        /// 组装状态栏条目（模式/推理/协作/端点）。
+        [[nodiscard]] static auto buildStatusItems(const BridgeConfig &cfg) -> std::vector<StatusItem>;
+        /// 以配置描述协作拓扑 → 供 UI 折叠呈现（复用 OrchestrationInfo）。
+        [[nodiscard]] static auto describeTopology(const BridgeConfig &cfg) -> OrchestrationInfo;
+        /// 回填助手消息的编排信息块（推理模式 + 协作拓扑）。
+        auto publishOrchestration(const BridgeConfig &cfg, const std::string &sessionId,
+                                  const std::string &messageId, std::string_view failure) -> void;
+
         /// 单会话桥接状态：AE 侧对话历史（OpenAI messages 形态）+ TUI 消息镜像。
         struct SessionState
         {

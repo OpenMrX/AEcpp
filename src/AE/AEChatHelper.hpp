@@ -24,7 +24,7 @@
 
 #include "Core/Result.hpp"
 #include "AEType.hpp"
-#include "IAE.hpp"
+#include "AESimple.hpp"
 #include "LLMAdapter.hpp"
 #include "AE.hpp"
 #include "StreamingLLMClient.hpp"

@@ -20,7 +20,7 @@
 
 #include "Core/Result.hpp"
 #include "Core/Error.hpp"
-#include "IAE.hpp"
+#include "AEType.hpp"
 
 namespace AE::Engine
 {

@@ -36,7 +36,13 @@ namespace AE::Core
         VersionMismatch,
         InvalidOperation,
         InitializationFailed,
-        Busy
+        Busy,
+        // —— Ports 层通用错误码（见 Docs/01 §7 前言）——
+        PortUnavailable,
+        PortTimeout,
+        PortDenied,
+        PortInvalidArg,
+        PortInternal
     };
 
     /// 日志级别。

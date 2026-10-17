@@ -13,7 +13,7 @@
 /// - 线程安全：std::mutex 保护文件 I/O。
 ///
 /// @note 所属命名空间：AE::Engine
-/// @note 依赖：IAE.hpp（IStateStore）、nlohmann::json、Core::Result。
+/// @note 依赖：AEType.hpp（IStateStore）、nlohmann::json、Core::Result。
 
 #include <filesystem>
 #include <mutex>
@@ -24,7 +24,7 @@
 #include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
-#include "IAE.hpp"
+#include "AEType.hpp"
 
 namespace AE::Engine
 {

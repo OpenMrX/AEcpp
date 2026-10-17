@@ -87,6 +87,11 @@ namespace AE::Core
             case InvalidOperation: return "InvalidOperation";
             case InitializationFailed: return "InitializationFailed";
             case Busy: return "Busy";
+            case PortUnavailable: return "PortUnavailable";
+            case PortTimeout: return "PortTimeout";
+            case PortDenied: return "PortDenied";
+            case PortInvalidArg: return "PortInvalidArg";
+            case PortInternal: return "PortInternal";
             }
             return "Unknown";
         }

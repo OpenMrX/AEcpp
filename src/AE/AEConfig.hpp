@@ -34,7 +34,7 @@
 #include "nlohmann-json.hpp"
 #include "Core/Security/SecureString.hpp"
 
-#include "AEManager.hpp"   // StreamingLLMClient（config → client 工厂）
+#include "StreamingLLMClient.hpp"   // StreamingLLMClient（config → client 工厂）
 #include "AESecurity.hpp"  // EgressPolicy
 #include "Core/Logger.hpp"
 #include "Core/Result.hpp"

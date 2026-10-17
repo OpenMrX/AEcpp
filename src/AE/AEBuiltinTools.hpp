@@ -10,7 +10,7 @@
 /// 也可单独注册各工具类。
 ///
 /// @note 所属命名空间：AE::Engine
-/// @note 依赖：IAE.hpp（IToolProvider）、nlohmann::json、Core::Result。
+/// @note 依赖：AEType.hpp（IToolProvider）、nlohmann::json、Core::Result。
 
 #include <cstddef>
 #include <map>
@@ -18,7 +18,7 @@
 #include <string_view>
 
 #include "Core/Result.hpp"
-#include "IAE.hpp"
+#include "AEType.hpp"
 
 namespace AE::Engine
 {

@@ -14,7 +14,7 @@
 /// nlohmann::json、Core::Result。
 ///
 /// @note 所属命名空间：AE::Engine
-/// @note 依赖：IAE.hpp（IToolProvider）、AESecurityGuard.hpp（AllowedToolsStore）、
+/// @note 依赖：AEType.hpp（IToolProvider）、AESecurityGuard.hpp（AllowedToolsStore）、
 
 #include <flat_map>
 #include <functional>
@@ -27,7 +27,7 @@
 #include "nlohmann-json.hpp"
 
 #include "Core/Result.hpp"
-#include "IAE.hpp"
+#include "AEType.hpp"
 #include "AESecurityGuard.hpp"
 
 namespace AE::Engine

@@ -59,9 +59,9 @@ namespace
         std::println("                        给定模型名时以它预填\"模型\"字段");
         std::println("  -h, --help            显示本帮助并退出");
         std::println();
-        std::println("运行时快捷键: Ctrl+G 模型配置页 | Ctrl+H 帮助 | Ctrl+P 停止 | Ctrl+Q 退出");
-        std::println("配置优先级:   环境变量 (VXAE_ENDPOINT/VXAE_API_KEY/VXAE_MODEL/VXAE_AGENT_MODE)");
-        std::println("              > demo_config.json > 内置默认");
+        std::println("运行时快捷键: Ctrl+G 模型配置页 | Ctrl+R 推理模式 | Ctrl+B 协作模式 | Ctrl+H 帮助 | Ctrl+P 停止 | Ctrl+Q 退出");
+        std::println("配置优先级:   环境变量 (VXAE_ENDPOINT/VXAE_API_KEY/VXAE_MODEL/VXAE_AGENT_MODE/");
+        std::println("              VXAE_REASONING_MODE/VXAE_COLLAB_MODE) > demo_config.json > 内置默认");
     }
 
     // 仅支持 -m/--model（值可选，亦支持 --model=值）与 -h/--help；其余参数判 invalid。
@@ -214,6 +214,12 @@ auto main(int argc, char **argv) -> int
         case TUIEvent::Type::StopRequested:
             bridge.requestStop();
             break;
+        case TUIEvent::Type::ReasoningModeCycle:
+            bridge.cycleReasoningMode();
+            break;
+        case TUIEvent::Type::CollabModeCycle:
+            bridge.cycleCollabMode();
+            break;
         case TUIEvent::Type::ModelSwitch:
             bridge.switchModel(ev.payload);
             tui->setDefaultModel(ev.payload); // 同步持久化 defaultModel
@@ -320,6 +326,9 @@ auto main(int argc, char **argv) -> int
         std::println("  模型    : {}", cfg.model);
         std::println("  端点    : {}", AETUIBridge::normalizeEndpoint(cfg.endpoint));
         std::println("  配置页  : 未配置模型列表时自动弹出 · vxae_demo -m/--model · 运行时 Ctrl+G · 保存写入 demo_config.json");
+        std::println("  推理/协作: {} / {}（Ctrl+R 循环推理 · Ctrl+B 循环协作）",
+                     cfg.reasoningMode.empty() ? std::string{"react"} : cfg.reasoningMode,
+                     cfg.collabMode.empty() ? std::string{"off"} : cfg.collabMode);
         std::println("  快捷键  : Ctrl+P 停止生成 | Ctrl+N 新会话 | Ctrl+G 模型配置 | Ctrl+Q 退出 | Ctrl+H 帮助");
     }
 

@@ -594,6 +594,10 @@ namespace
                         ftxui::text("Ctrl+I  切换意图分析") | ftxui::color(tc.foreground),
                         ftxui::text("Ctrl+P  停止当前生成") | ftxui::color(tc.foreground),
                         ftxui::text("Ctrl+L  清空当前会话") | ftxui::color(tc.foreground),
+                        ftxui::text("Ctrl+R  循环推理模式 (react/plan/reflection)") |
+                            ftxui::color(tc.foreground),
+                        ftxui::text("Ctrl+B  循环协作模式 (off/orchestrator/...)") |
+                            ftxui::color(tc.foreground),
                         ftxui::text("Ctrl+Q  退出") | ftxui::color(tc.foreground),
                         ftxui::text("输入框：Enter 换行 · Shift+Enter 发送") |
                             ftxui::color(tc.foreground),
@@ -841,6 +845,24 @@ namespace
         {
             emitEvent(TUIEvent{
                 .type = TUIEvent::Type::ToggleIntent,
+                .sessionId = m_currentSessionId,
+            });
+            return true;
+        }
+
+        // P8 集成：Ctrl+R 循环单 Agent 推理模式；Ctrl+B 循环多 Agent 协作模式。
+        if (event == ftxui::Event::CtrlR)
+        {
+            emitEvent(TUIEvent{
+                .type = TUIEvent::Type::ReasoningModeCycle,
+                .sessionId = m_currentSessionId,
+            });
+            return true;
+        }
+        if (event == ftxui::Event::CtrlB)
+        {
+            emitEvent(TUIEvent{
+                .type = TUIEvent::Type::CollabModeCycle,
                 .sessionId = m_currentSessionId,
             });
             return true;

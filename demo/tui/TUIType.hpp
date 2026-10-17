@@ -200,6 +200,9 @@ namespace AE::TUI
             ModelConfigApply,
             RestartRequested,
             StopRequested, // Ctrl+P：请求停止当前生成（桥接层消费）
+            // P8 集成：循环切换单 Agent 推理模式 / 多 Agent 协作模式（桥接层消费并联动状态栏）。
+            ReasoningModeCycle,
+            CollabModeCycle,
             // 占位：帮助信息事件（当前未绑定按键，保留供后续实现）。
             HelpRequested
         };

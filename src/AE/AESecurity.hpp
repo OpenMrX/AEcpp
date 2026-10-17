@@ -24,7 +24,7 @@
 
 #include "Core/Result.hpp"
 #include "Core/Logger.hpp"
-#include "IAE.hpp" // IPermissionGate
+#include "AEType.hpp" // IPermissionGate
 
 namespace AE::Engine
 {
